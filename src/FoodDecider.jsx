@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, ThumbsUp, MapPin, Star, DollarSign, Clock, Navigation, Phone, Zap } from 'lucide-react';
 
 const SUPABASE_URL = 'YOUR_SUPABASE_URL';
 const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
@@ -22,47 +21,48 @@ const FoodDecider = () => {
   const [voteSubmitted, setVoteSubmitted] = useState(false);
   const [liveScores, setLiveScores] = useState({});
   const messagesEndRef = useRef(null);
-  const resultRef = useRef(null);
+  const scrollRef = useRef(null);
+  const inputRef = useRef(null);
 
   const cuisineOptions = [
-    { name: 'Tacos', emoji: '🌮', type: 'mexican' },
-    { name: 'Pizza', emoji: '🍕', type: 'italian' },
-    { name: 'Sushi', emoji: '🍣', type: 'japanese' },
-    { name: 'Burgers', emoji: '🍔', type: 'american' },
-    { name: 'Thai', emoji: '🍜', type: 'thai' },
-    { name: 'Indian', emoji: '🍛', type: 'indian' },
+    { name: 'Tacos', type: 'mexican' },
+    { name: 'Pizza', type: 'italian' },
+    { name: 'Sushi', type: 'japanese' },
+    { name: 'Burgers', type: 'american' },
+    { name: 'Thai', type: 'thai' },
+    { name: 'Indian', type: 'indian' },
   ];
 
   const restaurantDB = {
     mexican: [
-      { id: 'street-taco-stand', name: 'Street Taco Stand', rating: 4.3, price: 1, specialty: 'authentic street tacos', waitTime: '5-10 min', address: '456 Main St', phone: '(555) 111-2222', reviews: 523, vibe: 'quick', hours: '11 AM - 9 PM', neighborhood: 'Downtown' },
-      { id: 'taco-libre', name: 'Taco Libre', rating: 4.8, price: 2, specialty: 'birria tacos', waitTime: '10-15 min', address: '234 Mission St', phone: '(555) 234-5678', reviews: 847, vibe: 'comfort', hours: '11 AM - 10 PM', neighborhood: 'Mission District' },
-      { id: 'casa-de-oro', name: 'Casa de Oro', rating: 4.7, price: 3, specialty: 'molcajete mixto', waitTime: '25-30 min', address: '789 Sunset Blvd', phone: '(555) 333-4444', reviews: 612, vibe: 'upscale', hours: '5 PM - 11 PM', neighborhood: 'Uptown' },
+      { id: 'cilantro-mexican-grill', name: 'Cilantro Mexican Grill', rating: 4.4, price: 1, specialty: 'carne asada burrito', waitTime: '5-10 min', phone: '(310) 558-4400', reviews: 812, vibe: 'quick', hours: '11 AM - 9 PM', neighborhood: 'Culver City' },
+      { id: 'mas-malo', name: 'Mas Malo', rating: 4.5, price: 2, specialty: 'birria tacos', waitTime: '10-15 min', phone: '(310) 391-0800', reviews: 1243, vibe: 'comfort', hours: '11 AM - 10 PM', neighborhood: 'Culver City' },
+      { id: 'hugos-tacos', name: "Hugo's Tacos", rating: 4.3, price: 1, specialty: 'veggie tacos', waitTime: '5 min', phone: '(310) 670-3500', reviews: 967, vibe: 'quick', hours: '10 AM - 9 PM', neighborhood: 'Culver City' },
     ],
     italian: [
-      { id: 'quick-slice', name: 'Quick Slice Pizza', rating: 4.2, price: 1, specialty: 'pepperoni slices', waitTime: '5 min', address: '321 Oak Ave', phone: '(555) 555-6666', reviews: 734, vibe: 'quick', hours: '10 AM - 11 PM', neighborhood: 'Downtown' },
-      { id: 'tonys-pizza', name: "Tony's Pizza House", rating: 4.4, price: 2, specialty: 'NY-style pizza', waitTime: '10-15 min', address: '123 Broadway', phone: '(555) 678-9012', reviews: 956, vibe: 'comfort', hours: '11 AM - 10 PM', neighborhood: 'Midtown' },
-      { id: 'bella-trattoria', name: 'Bella Trattoria', rating: 4.6, price: 3, specialty: 'homemade pasta', waitTime: '30-40 min', address: '567 Pine St', phone: '(555) 777-8888', reviews: 421, vibe: 'upscale', hours: '5 PM - 11 PM', neighborhood: 'Italian Quarter' },
+      { id: 'tender-greens', name: 'Tender Greens', rating: 4.4, price: 2, specialty: 'roasted chicken plate', waitTime: '10 min', phone: '(310) 842-8300', reviews: 1876, vibe: 'comfort', hours: '11 AM - 9 PM', neighborhood: 'Culver City' },
+      { id: 'il-capriccio', name: 'Il Capriccio', rating: 4.7, price: 3, specialty: 'house-made tagliatelle', waitTime: '20-30 min', phone: '(310) 208-5792', reviews: 521, vibe: 'upscale', hours: '5 PM - 10 PM', neighborhood: 'Westwood' },
+      { id: 'rome-in-a-cup', name: 'Rome in a Cup', rating: 4.6, price: 1, specialty: 'authentic gelato', waitTime: '5 min', phone: '(310) 839-0000', reviews: 634, vibe: 'quick', hours: '10 AM - 10 PM', neighborhood: 'Culver City' },
     ],
     japanese: [
-      { id: 'sushi-express', name: 'Sushi Express', rating: 4.1, price: 1, specialty: 'california rolls', waitTime: '10 min', address: '234 Elm St', phone: '(555) 999-0000', reviews: 645, vibe: 'quick', hours: '11 AM - 9 PM', neighborhood: 'Downtown' },
-      { id: 'ramen-station', name: 'Ramen Station', rating: 4.6, price: 2, specialty: 'tonkotsu ramen', waitTime: '15-20 min', address: '678 Post St', phone: '(555) 901-2345', reviews: 1089, vibe: 'comfort', hours: '11 AM - 10 PM', neighborhood: 'Japantown' },
-      { id: 'sakura-omakase', name: 'Sakura Omakase', rating: 4.8, price: 3, specialty: "chef's omakase", waitTime: '45-60 min', address: '890 Cherry Ln', phone: '(555) 121-3141', reviews: 387, vibe: 'upscale', hours: '6 PM - 11 PM', neighborhood: 'Financial District' },
+      { id: 'tsujita-la', name: 'Tsujita LA', rating: 4.7, price: 2, specialty: 'tsukemen ramen', waitTime: '20-30 min', phone: '(310) 231-7373', reviews: 3421, vibe: 'comfort', hours: '11 AM - 11 PM', neighborhood: 'Sawtelle' },
+      { id: 'hide-sushi', name: 'Hide Sushi', rating: 4.6, price: 2, specialty: 'omakase nigiri', waitTime: '15-20 min', phone: '(310) 477-7242', reviews: 2134, vibe: 'comfort', hours: '11:30 AM - 10 PM', neighborhood: 'Sawtelle' },
+      { id: 'hakata-ikkousha', name: 'Hakata Ikkousha', rating: 4.5, price: 2, specialty: 'tonkotsu ramen', waitTime: '15 min', phone: '(310) 914-1661', reviews: 987, vibe: 'quick', hours: '11 AM - 10 PM', neighborhood: 'West LA' },
     ],
     american: [
-      { id: 'fast-burger', name: 'Fast Burger Shack', rating: 4.0, price: 1, specialty: 'classic cheeseburger', waitTime: '8 min', address: '123 First St', phone: '(555) 151-6171', reviews: 892, vibe: 'quick', hours: '10 AM - 10 PM', neighborhood: 'Downtown' },
-      { id: 'burger-joint', name: 'The Burger Joint', rating: 4.5, price: 2, specialty: 'signature burgers', waitTime: '10-15 min', address: '890 Polk St', phone: '(555) 123-4567', reviews: 1432, vibe: 'comfort', hours: '11 AM - 10 PM', neighborhood: 'Castro' },
-      { id: 'gourmet-grill', name: 'Gourmet Grill House', rating: 4.7, price: 3, specialty: 'wagyu burger', waitTime: '20-25 min', address: '456 Market St', phone: '(555) 181-9202', reviews: 534, vibe: 'upscale', hours: '5 PM - 11 PM', neighborhood: 'SoMa' },
+      { id: 'fathers-office', name: "Father's Office", rating: 4.4, price: 2, specialty: 'The Office Burger', waitTime: '10-20 min', phone: '(310) 736-2224', reviews: 5621, vibe: 'comfort', hours: '4 PM - 11 PM', neighborhood: 'Culver City' },
+      { id: 'in-n-out-culver', name: 'In-N-Out Burger', rating: 4.5, price: 1, specialty: 'Double Double Animal Style', waitTime: '5-10 min', phone: '(800) 786-1000', reviews: 8934, vibe: 'quick', hours: '10:30 AM - 1 AM', neighborhood: 'Culver City' },
+      { id: 'gourmet-grill', name: 'Gourmet Grill House', rating: 4.7, price: 3, specialty: 'wagyu burger', waitTime: '20-25 min', phone: '(310) 555-9202', reviews: 534, vibe: 'upscale', hours: '5 PM - 11 PM', neighborhood: 'Culver City' },
     ],
     thai: [
-      { id: 'thai-quick', name: 'Thai Quick Bites', rating: 4.2, price: 1, specialty: 'pad thai', waitTime: '10 min', address: '789 Oak St', phone: '(555) 222-3333', reviews: 567, vibe: 'quick', hours: '11 AM - 9 PM', neighborhood: 'Chinatown' },
-      { id: 'thai-basil', name: 'Thai Basil', rating: 4.6, price: 2, specialty: 'green curry', waitTime: '15-20 min', address: '345 Market St', phone: '(555) 444-5555', reviews: 823, vibe: 'comfort', hours: '11 AM - 10 PM', neighborhood: 'Midtown' },
-      { id: 'royal-thai', name: 'Royal Thai Cuisine', rating: 4.8, price: 3, specialty: 'royal platter', waitTime: '30-40 min', address: '567 Union St', phone: '(555) 666-7777', reviews: 445, vibe: 'upscale', hours: '5 PM - 10 PM', neighborhood: 'Nob Hill' },
+      { id: 'charm-thai', name: 'Charm Thai', rating: 4.6, price: 2, specialty: 'massaman curry', waitTime: '15-20 min', phone: '(310) 839-4222', reviews: 876, vibe: 'comfort', hours: '11 AM - 10 PM', neighborhood: 'Culver City' },
+      { id: 'thai-dishes', name: 'Thai Dishes', rating: 4.4, price: 1, specialty: 'pad see ew', waitTime: '10 min', phone: '(323) 665-5900', reviews: 1243, vibe: 'quick', hours: '11 AM - 9:30 PM', neighborhood: 'Culver City' },
+      { id: 'palms-thai', name: 'Palms Thai', rating: 4.3, price: 1, specialty: 'green curry', waitTime: '10 min', phone: '(323) 462-5073', reviews: 2341, vibe: 'quick', hours: '11 AM - 11 PM', neighborhood: 'Culver City' },
     ],
     indian: [
-      { id: 'curry-express', name: 'Curry Express', rating: 4.1, price: 1, specialty: 'chicken tikka masala', waitTime: '10 min', address: '234 Mission St', phone: '(555) 888-9999', reviews: 456, vibe: 'quick', hours: '11 AM - 9 PM', neighborhood: 'Downtown' },
-      { id: 'curry-house', name: 'Curry House', rating: 4.5, price: 2, specialty: 'butter chicken', waitTime: '20-25 min', address: '567 Divisadero St', phone: '(555) 678-9012', reviews: 634, vibe: 'comfort', hours: '11 AM - 10 PM', neighborhood: 'Haight' },
-      { id: 'tandoor-palace', name: 'Tandoor Palace', rating: 4.7, price: 3, specialty: 'tandoori platter', waitTime: '25-30 min', address: '890 Union St', phone: '(555) 789-0123', reviews: 445, vibe: 'upscale', hours: '5 PM - 11 PM', neighborhood: 'Marina' },
+      { id: 'mayura', name: 'Mayura Indian Restaurant', rating: 4.7, price: 2, specialty: 'butter chicken', waitTime: '15 min', phone: '(310) 559-9644', reviews: 3421, vibe: 'comfort', hours: '11:30 AM - 10 PM', neighborhood: 'Culver City' },
+      { id: 'india-sweets', name: 'India Sweets & Spices', rating: 4.6, price: 1, specialty: 'chana masala thali', waitTime: '5-10 min', phone: '(310) 837-5286', reviews: 2134, vibe: 'quick', hours: '11 AM - 9 PM', neighborhood: 'Culver City' },
+      { id: 'akbar-restaurant', name: 'Akbar Restaurant', rating: 4.5, price: 2, specialty: 'lamb saag', waitTime: '15-20 min', phone: '(310) 586-7738', reviews: 1567, vibe: 'comfort', hours: '11:30 AM - 10 PM', neighborhood: 'Culver City' },
     ],
   };
 
@@ -102,11 +102,11 @@ const FoodDecider = () => {
   }, [initialized, addMessage]);
 
   useEffect(() => {
-    if (messages.length > 0 && messages[messages.length - 1].component === 'result') {
-      setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
-    } else {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }
+    setTimeout(() => {
+      if (scrollRef.current) {
+        scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      }
+    }, 100);
   }, [messages]);
 
   const handleLocation = (loc) => {
@@ -124,44 +124,42 @@ const FoodDecider = () => {
 
   const handleCuisine = (c) => {
     setPreferences(p => ({ ...p, cuisines: [c.type] }));
-    addMessage('bot', `${c.emoji} ${c.name}! Great choice!`);
+    addMessage('bot', `${c.name} — great choice!`);
     setTimeout(() => addMessage('bot', "What's your budget?", 'budget'), 600);
   };
 
   const handleBudget = (b) => {
     const currentVibe = preferences.vibe;
+    const currentCuisine = preferences.cuisines[0] || 'american';
     setPreferences(p => ({ ...p, budget: b }));
     addMessage('bot', ['', 'Perfect! 💪', 'Nice! 👌', 'Premium! 🎩'][b]);
     setTimeout(() => {
       setIsLoading(true);
-      addMessage('bot', 'Finding your spot... ✨');
+      addMessage('bot', 'Finding your 2 best spots... ✨');
       setTimeout(async () => {
         setIsLoading(false);
-        const cuisineType = preferences.cuisines[0] || 'mexican';
-        const all = restaurantDB[cuisineType];
+        const all = restaurantDB[currentCuisine];
         let filtered = all.filter(r => r.price === b);
         if (!filtered.length) filtered = all.filter(r => r.price <= b);
         if (!filtered.length) filtered = all;
         const vibeMap = { 'Quick & Easy': 'quick', Adventure: 'adventure', Comfort: 'comfort', 'Treat Myself': 'upscale' };
-        let restaurant = filtered.find(r => r.vibe === vibeMap[currentVibe]) || filtered.sort((a, c) => c.rating - a.rating)[0];
-        const reasons = {
-          'Quick & Easy': `You wanted quick — ${restaurant.name} has super fast service (${restaurant.waitTime}) and great food.`,
-          Adventure: `For your adventurous spirit — ${restaurant.name} is rated ${restaurant.rating}⭐ and their ${restaurant.specialty} is legendary.`,
-          Comfort: `Perfect comfort vibes — ${restaurant.name}'s ${restaurant.specialty} is exactly what you need right now.`,
-          'Treat Myself': `You deserve this — ${restaurant.name} is a premium spot. Their ${restaurant.specialty} is something special.`,
-        };
-        let reasoning = reasons[currentVibe] || `${restaurant.name} matches your vibe perfectly.`;
-        if (b === 1) reasoning += ' Great value.';
-        if (b === 3) reasoning += ' Worth the splurge.';
-        const liveScore = await fetchLiveScore(restaurant.id);
-        if (liveScore) setLiveScores(prev => ({ ...prev, [restaurant.id]: liveScore }));
-        addMessage('bot', '', 'result', { restaurant, reasoning, location: userLocation, liveScore });
+        const sorted = [...filtered].sort((a, c) => {
+          if (a.vibe === vibeMap[currentVibe] && c.vibe !== vibeMap[currentVibe]) return -1;
+          if (c.vibe === vibeMap[currentVibe] && a.vibe !== vibeMap[currentVibe]) return 1;
+          return c.rating - a.rating;
+        });
+        const top2 = sorted.slice(0, 2);
+        const scores = await Promise.all(top2.map(r => fetchLiveScore(r.id)));
+        const newScores = {};
+        top2.forEach((r, i) => { if (scores[i]) newScores[r.id] = scores[i]; });
+        setLiveScores(prev => ({ ...prev, ...newScores }));
+        addMessage('bot', '', 'result', { restaurants: top2, location: userLocation, liveScores: newScores });
       }, 1800);
     }, 500);
   };
 
   const handleGoThere = (restaurant) => {
-    window.open(`https://maps.google.com/?q=${encodeURIComponent(restaurant.name + ' ' + restaurant.address)}`, '_blank');
+    window.open(`https://maps.google.com/search?q=${encodeURIComponent(restaurant.name + ' ' + restaurant.neighborhood + ' Los Angeles CA')}`, '_blank');
     setTimeout(() => setVoteScreen({ restaurantId: restaurant.id, restaurantName: restaurant.name, dish: restaurant.specialty }), 3000);
   };
 
@@ -169,113 +167,137 @@ const FoodDecider = () => {
     if (!input.trim()) return;
     if (!userLocation) handleLocation(input.trim());
     setInput('');
+    inputRef.current?.blur();
   };
 
-  const s = {
-    page: { minHeight: '100vh', display: 'flex', flexDirection: 'column', background: '#080808', fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif', color: '#F0EDE8' },
-    header: { background: '#0F0F0F', borderBottom: '1px solid #1A1A1A', padding: '18px 20px', textAlign: 'center', flexShrink: 0 },
-    headerTitle: { fontSize: '26px', fontWeight: '900', color: '#FF5C35', letterSpacing: '-0.5px', margin: 0 },
-    headerSub: { fontSize: '11px', color: '#333', marginTop: '3px', textTransform: 'uppercase', letterSpacing: '0.08em' },
-    messages: { flex: 1, overflowY: 'auto', padding: '16px' },
-    inner: { maxWidth: '460px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '10px' },
-    botBubble: { background: '#141414', border: '1px solid #1E1E1E', borderRadius: '16px 16px 16px 4px', padding: '12px 16px', fontSize: '14px', color: '#D0CCC8', maxWidth: '85%', whiteSpace: 'pre-line', lineHeight: '1.5' },
-    userBubble: { background: '#FF5C35', borderRadius: '16px 16px 4px 16px', padding: '12px 16px', fontSize: '14px', color: '#fff', fontWeight: '600', maxWidth: '80%', alignSelf: 'flex-end' },
-    card: { background: '#0F0F0F', border: '1px solid #1E1E1E', borderRadius: '16px', padding: '16px' },
-    cardTitle: { fontSize: '14px', color: '#D0CCC8', marginBottom: '12px', lineHeight: '1.5', whiteSpace: 'pre-line' },
-    grid2: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' },
-    grid3: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' },
-    vibeBtn: { background: '#141414', border: '1px solid #242424', borderRadius: '12px', padding: '16px 10px', cursor: 'pointer', textAlign: 'center', transition: 'border-color 0.15s' },
-    cuisineBtn: { background: '#141414', border: '1px solid #242424', borderRadius: '12px', padding: '14px 8px', cursor: 'pointer', textAlign: 'center' },
-    budgetBtn: { background: '#141414', border: '1px solid #242424', borderRadius: '12px', padding: '18px 8px', cursor: 'pointer', textAlign: 'center' },
-    input: { background: '#0F0F0F', borderTop: '1px solid #1A1A1A', padding: '14px 16px', flexShrink: 0 },
-    inputRow: { maxWidth: '460px', margin: '0 auto', display: 'flex', gap: '8px' },
-    inputField: { flex: 1, background: '#141414', border: '1px solid #242424', borderRadius: '12px', padding: '13px 16px', fontSize: '14px', color: '#F0EDE8', outline: 'none' },
-    sendBtn: { background: '#FF5C35', border: 'none', borderRadius: '12px', padding: '13px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' },
-    inputHint: { textAlign: 'center', fontSize: '11px', color: '#2A2A2A', marginTop: '8px', letterSpacing: '0.04em' },
-    overlay: { position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(0,0,0,0.92)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' },
-    voteCard: { background: '#0F0F0F', border: '1px solid #1E1E1E', borderRadius: '24px', padding: '28px 22px', maxWidth: '340px', width: '100%' },
-    voteTitle: { fontSize: '22px', fontWeight: '900', color: '#F0EDE8', textAlign: 'center', marginBottom: '6px' },
-    voteSub: { fontSize: '12px', color: '#444', textAlign: 'center', marginBottom: '20px' },
-    voteDish: { background: '#141414', border: '1px solid #1E1E1E', borderRadius: '12px', padding: '12px 14px', marginBottom: '18px', display: 'flex', gap: '10px', alignItems: 'center' },
-    voteButtons: { display: 'flex', gap: '10px' },
-    worthItBtn: { flex: 1, background: '#0D2B1A', border: '1px solid #22C55E', color: '#22C55E', borderRadius: '12px', padding: '15px', fontSize: '15px', fontWeight: '800', cursor: 'pointer' },
-    notQuiteBtn: { flex: 1, background: '#2B0D0D', border: '1px solid #EF4444', color: '#EF4444', borderRadius: '12px', padding: '15px', fontSize: '15px', fontWeight: '800', cursor: 'pointer' },
+  const card = { background: '#0F0F0F', border: '1px solid #1E1E1E', borderRadius: '16px', padding: '14px' };
+
+  const RestaurantCard = ({ restaurant, msgScores, isFirst }) => {
+    const score = msgScores?.[restaurant.id] || liveScores[restaurant.id];
+    return (
+      <div style={{ background: '#0F0F0F', border: `1px solid ${isFirst ? '#FF5C35' : '#1E1E1E'}`, borderRadius: '16px', marginBottom: '10px', overflow: 'hidden' }}>
+        {isFirst && (
+          <div style={{ background: '#FF5C35', padding: '5px 0', fontSize: '10px', fontWeight: '800', color: '#fff', letterSpacing: '0.1em', textAlign: 'center' }}>
+            TOP PICK
+          </div>
+        )}
+        <div style={{ padding: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+            <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: score ? '#22C55E' : '#2A2A2A', flexShrink: 0 }} />
+            <span style={{ fontSize: '11px', fontWeight: '700', color: score ? '#22C55E' : '#333' }}>
+              {score ? `${score.pct}% worth it · voted ${score.freshness}` : 'be the first to vote after visiting'}
+            </span>
+          </div>
+          <div style={{ fontSize: '20px', fontWeight: '900', color: '#F0EDE8', letterSpacing: '-0.3px', marginBottom: '2px' }}>{restaurant.name}</div>
+          <div style={{ fontSize: '12px', color: '#444', marginBottom: '12px' }}>📍 {restaurant.neighborhood} · 🕐 {restaurant.hours}</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '6px', marginBottom: '12px' }}>
+            {[
+              { val: `${restaurant.rating}★`, sub: `${restaurant.reviews} reviews`, color: '#F59E0B' },
+              { val: '$'.repeat(restaurant.price), sub: 'price', color: '#22C55E' },
+              { val: restaurant.waitTime, sub: 'wait', color: '#60A5FA' },
+            ].map((st, si) => (
+              <div key={si} style={{ background: '#141414', border: '1px solid #1E1E1E', borderRadius: '10px', padding: '10px 6px', textAlign: 'center' }}>
+                <div style={{ fontSize: '13px', fontWeight: '800', color: st.color }}>{st.val}</div>
+                <div style={{ fontSize: '9px', color: '#333', marginTop: '3px' }}>{st.sub}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ background: '#141414', borderLeft: '2px solid #FF5C35', borderRadius: '0 10px 10px 0', padding: '10px 14px', marginBottom: '12px' }}>
+            <div style={{ fontSize: '9px', color: '#FF5C35', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '3px' }}>must try</div>
+            <div style={{ fontSize: '15px', fontWeight: '700', color: '#F0EDE8' }}>{restaurant.specialty}</div>
+          </div>
+          <button
+            onClick={() => handleGoThere(restaurant)}
+            style={{ width: '100%', background: isFirst ? '#FF5C35' : 'transparent', color: isFirst ? '#fff' : '#555', border: isFirst ? 'none' : '1px solid #2A2A2A', borderRadius: '12px', padding: '14px', fontSize: '14px', fontWeight: '800', cursor: 'pointer', marginBottom: '10px', display: 'block' }}
+          >
+            {isFirst ? '🗺️ Take me here' : '🗺️ Or go here instead'}
+          </button>
+          <a href={`tel:${restaurant.phone}`} style={{ display: 'block', textAlign: 'center', fontSize: '12px', color: '#333', textDecoration: 'none' }}>
+            📞 {restaurant.phone}
+          </a>
+        </div>
+      </div>
+    );
   };
 
   return (
-    <div style={s.page}>
+    <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', background: '#080808', fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif', color: '#F0EDE8', overflow: 'hidden' }}>
 
       {voteScreen && (
-        <div style={s.overlay}>
-          <div style={s.voteCard}>
+        <div style={{ position: 'absolute', inset: 0, zIndex: 100, background: 'rgba(0,0,0,0.92)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+          <div style={{ background: '#0F0F0F', border: '1px solid #1E1E1E', borderRadius: '24px', padding: '28px 22px', maxWidth: '340px', width: '100%' }}>
             {!voteSubmitted ? (
               <>
-                <div style={{ textAlign: 'center', marginBottom: '6px', fontSize: '40px' }}>🍽️</div>
-                <div style={s.voteTitle}>How was it?</div>
-                <div style={s.voteSub}>One tap · takes 2 seconds</div>
-                <div style={s.voteDish}>
+                <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+                  <div style={{ fontSize: '44px', marginBottom: '10px' }}>🍽️</div>
+                  <div style={{ fontSize: '22px', fontWeight: '900', color: '#F0EDE8', marginBottom: '4px' }}>How was it?</div>
+                  <div style={{ fontSize: '12px', color: '#444' }}>One tap · takes 2 seconds</div>
+                </div>
+                <div style={{ background: '#141414', border: '1px solid #1E1E1E', borderRadius: '12px', padding: '12px 14px', marginBottom: '18px', display: 'flex', gap: '10px', alignItems: 'center' }}>
                   <span style={{ fontSize: '20px' }}>⚡</span>
                   <div>
                     <div style={{ fontSize: '14px', fontWeight: '700', color: '#F0EDE8' }}>{voteScreen.dish}</div>
-                    <div style={{ fontSize: '12px', color: '#444', marginTop: '2px' }}>{voteScreen.restaurantName}</div>
+                    <div style={{ fontSize: '11px', color: '#444', marginTop: '2px' }}>{voteScreen.restaurantName}</div>
                   </div>
                 </div>
-                <div style={s.voteButtons}>
-                  <button style={s.worthItBtn} onClick={() => submitVote(true)}>✓ Worth it</button>
-                  <button style={s.notQuiteBtn} onClick={() => submitVote(false)}>✗ Not quite</button>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button onClick={() => submitVote(true)} style={{ flex: 1, background: '#0D2B1A', border: '1px solid #22C55E', color: '#22C55E', borderRadius: '12px', padding: '15px', fontSize: '15px', fontWeight: '800', cursor: 'pointer' }}>✓ Worth it</button>
+                  <button onClick={() => submitVote(false)} style={{ flex: 1, background: '#2B0D0D', border: '1px solid #EF4444', color: '#EF4444', borderRadius: '12px', padding: '15px', fontSize: '15px', fontWeight: '800', cursor: 'pointer' }}>✗ Not quite</button>
                 </div>
-                <div style={{ textAlign: 'center', fontSize: '11px', color: '#2A2A2A', marginTop: '12px' }}>your vote updates the score in real time</div>
+                <div style={{ textAlign: 'center', fontSize: '10px', color: '#2A2A2A', marginTop: '12px' }}>your vote updates the score in real time</div>
               </>
             ) : (
               <div style={{ textAlign: 'center', padding: '16px 0' }}>
                 <div style={{ fontSize: '48px', marginBottom: '12px' }}>✅</div>
                 <div style={{ fontSize: '20px', fontWeight: '900', color: '#F0EDE8', marginBottom: '6px' }}>Logged!</div>
-                <div style={{ fontSize: '13px', color: '#444', lineHeight: '1.6' }}>Score updated.<br />You helped the next person decide.</div>
+                <div style={{ fontSize: '13px', color: '#555', lineHeight: '1.6' }}>Score updated.<br />You helped the next person decide.</div>
               </div>
             )}
           </div>
         </div>
       )}
 
-      <div style={s.header}>
-        <div style={s.headerTitle}>Bitten60</div>
-        <div style={s.headerSub}>one answer · 60 seconds · worth it</div>
+      <div style={{ background: '#0F0F0F', borderBottom: '1px solid #1A1A1A', padding: '16px 20px 14px', textAlign: 'center', flexShrink: 0 }}>
+        <div style={{ fontSize: '26px', fontWeight: '900', color: '#FF5C35', letterSpacing: '-0.5px' }}>Bitten60</div>
+        <div style={{ fontSize: '10px', color: '#333', marginTop: '3px', textTransform: 'uppercase', letterSpacing: '0.1em' }}>2 picks · 60 seconds · someone was just there</div>
       </div>
 
-      <div style={s.messages}>
-        <div style={s.inner}>
-          {messages.map((msg, i) => (
-            <div key={i} ref={msg.component === 'result' ? resultRef : null} style={{ display: 'flex', flexDirection: 'column' }}>
+      <div ref={scrollRef} style={{ flex: 1, overflowY: 'scroll', WebkitOverflowScrolling: 'touch', padding: '16px' }}>
+        <div style={{ maxWidth: '460px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '10px' }}>
 
-              {msg.type === 'user' && <div style={s.userBubble}>{msg.content}</div>}
+          {messages.map((msg, i) => (
+            <div key={i} style={{ display: 'flex', flexDirection: 'column' }}>
+
+              {msg.type === 'user' && (
+                <div style={{ alignSelf: 'flex-end', background: '#FF5C35', borderRadius: '16px 16px 4px 16px', padding: '11px 15px', fontSize: '15px', color: '#fff', fontWeight: '600', maxWidth: '80%' }}>
+                  {msg.content}
+                </div>
+              )}
 
               {msg.type === 'bot' && !msg.component && msg.content && (
-                <div style={s.botBubble}>{msg.content}</div>
+                <div style={{ alignSelf: 'flex-start', background: '#141414', border: '1px solid #1E1E1E', borderRadius: '16px 16px 16px 4px', padding: '11px 15px', fontSize: '15px', color: '#D0CCC8', maxWidth: '85%', whiteSpace: 'pre-line', lineHeight: '1.5' }}>
+                  {msg.content}
+                </div>
               )}
 
               {msg.component === 'location' && (
-                <div style={s.card}>
-                  <div style={s.cardTitle}>{msg.content}</div>
-                  <div style={{ background: '#141414', border: '1px solid #242424', borderRadius: '10px', padding: '12px 14px', textAlign: 'center' }}>
-                    <div style={{ fontSize: '13px', color: '#444' }}>Type your city or neighborhood below</div>
+                <div style={card}>
+                  <div style={{ fontSize: '15px', color: '#D0CCC8', marginBottom: '10px', lineHeight: '1.5' }}>{msg.content}</div>
+                  <div style={{ background: '#141414', border: '1px solid #242424', borderRadius: '10px', padding: '14px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '13px', color: '#555' }}>Type your city or neighborhood below</div>
                     <div style={{ fontSize: '11px', color: '#2A2A2A', marginTop: '4px' }}>"Culver City" · "Downtown LA" · "Brooklyn"</div>
                   </div>
                 </div>
               )}
 
               {msg.component === 'vibe' && (
-                <div style={s.card}>
-                  <div style={s.cardTitle}>{msg.content}</div>
-                  <div style={s.grid2}>
-                    {[
-                      { name: 'Quick & Easy', emoji: '⚡' },
-                      { name: 'Adventure', emoji: '🌟' },
-                      { name: 'Comfort', emoji: '🛋️' },
-                      { name: 'Treat Myself', emoji: '👑' },
-                    ].map(v => (
-                      <button key={v.name} style={s.vibeBtn} onClick={() => handleVibe(v.name)}>
-                        <div style={{ fontSize: '26px', marginBottom: '6px' }}>{v.emoji}</div>
-                        <div style={{ fontSize: '12px', fontWeight: '700', color: '#D0CCC8' }}>{v.name}</div>
+                <div style={card}>
+                  <div style={{ fontSize: '15px', color: '#D0CCC8', marginBottom: '12px', whiteSpace: 'pre-line', lineHeight: '1.5' }}>{msg.content}</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                    {[{ name: 'Quick & Easy', emoji: '⚡' }, { name: 'Adventure', emoji: '🌟' }, { name: 'Comfort', emoji: '🛋️' }, { name: 'Treat Myself', emoji: '👑' }].map(v => (
+                      <button key={v.name} onClick={() => handleVibe(v.name)} style={{ background: '#141414', border: '1px solid #242424', borderRadius: '12px', padding: '18px 10px', cursor: 'pointer', textAlign: 'center', WebkitTapHighlightColor: 'transparent' }}>
+                        <div style={{ fontSize: '28px', marginBottom: '6px' }}>{v.emoji}</div>
+                        <div style={{ fontSize: '13px', fontWeight: '700', color: '#D0CCC8' }}>{v.name}</div>
                       </button>
                     ))}
                   </div>
@@ -283,13 +305,12 @@ const FoodDecider = () => {
               )}
 
               {msg.component === 'cuisine' && (
-                <div style={s.card}>
-                  <div style={s.cardTitle}>{msg.content}</div>
-                  <div style={s.grid3}>
+                <div style={card}>
+                  <div style={{ fontSize: '15px', color: '#D0CCC8', marginBottom: '12px' }}>{msg.content}</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '8px' }}>
                     {cuisineOptions.map(c => (
-                      <button key={c.type} style={s.cuisineBtn} onClick={() => handleCuisine(c)}>
-                        <div style={{ fontSize: '26px', marginBottom: '6px' }}>{c.emoji}</div>
-                        <div style={{ fontSize: '11px', fontWeight: '600', color: '#D0CCC8' }}>{c.name}</div>
+                      <button key={c.type} onClick={() => handleCuisine(c)} style={{ background: '#141414', border: '1px solid #242424', borderRadius: '12px', padding: '16px 8px', cursor: 'pointer', textAlign: 'center', WebkitTapHighlightColor: 'transparent', width: '100%' }}>
+                        <div style={{ fontSize: '14px', fontWeight: '700', color: '#D0CCC8' }}>{c.name}</div>
                       </button>
                     ))}
                   </div>
@@ -297,92 +318,33 @@ const FoodDecider = () => {
               )}
 
               {msg.component === 'budget' && (
-                <div style={s.card}>
-                  <div style={s.cardTitle}>{msg.content}</div>
-                  <div style={s.grid3}>
+                <div style={card}>
+                  <div style={{ fontSize: '15px', color: '#D0CCC8', marginBottom: '12px' }}>{msg.content}</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '8px' }}>
                     {[{ v: 1, l: 'Under $15', sym: '$' }, { v: 2, l: '$15–30', sym: '$$' }, { v: 3, l: '$30+', sym: '$$$' }].map(b => (
-                      <button key={b.v} style={s.budgetBtn} onClick={() => handleBudget(b.v)}>
-                        <div style={{ fontSize: '18px', fontWeight: '900', color: '#FF5C35', marginBottom: '4px' }}>{b.sym}</div>
-                        <div style={{ fontSize: '10px', color: '#555' }}>{b.l}</div>
+                      <button key={b.v} onClick={() => handleBudget(b.v)} style={{ background: '#141414', border: '1px solid #242424', borderRadius: '12px', padding: '20px 8px', cursor: 'pointer', textAlign: 'center', WebkitTapHighlightColor: 'transparent', width: '100%' }}>
+                        <div style={{ fontSize: '20px', fontWeight: '900', color: '#FF5C35', marginBottom: '4px' }}>{b.sym}</div>
+                        <div style={{ fontSize: '11px', color: '#555' }}>{b.l}</div>
                       </button>
                     ))}
                   </div>
                 </div>
               )}
 
-              {msg.component === 'result' && msg.data && (() => {
-                const { restaurant, reasoning, liveScore } = msg.data;
-                const score = liveScore || liveScores[restaurant.id];
-                return (
-                  <div style={{ background: '#0F0F0F', border: '1px solid #1E1E1E', borderRadius: '20px', overflow: 'hidden' }}>
-
-                    <div style={{ background: score ? '#051A0E' : '#0A0A14', borderBottom: '1px solid #1E1E1E', padding: '11px 16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                      <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: score ? '#22C55E' : '#2A2A2A', animation: 'pulse 1.5s infinite' }} />
-                      <span style={{ fontSize: '12px', fontWeight: '700', color: score ? '#22C55E' : '#333' }}>
-                        {score ? `${score.pct}% worth it · voted ${score.freshness}` : 'Be the first to vote after visiting'}
-                      </span>
-                    </div>
-
-                    <div style={{ padding: '18px' }}>
-
-                      <div style={{ marginBottom: '14px' }}>
-                        <div style={{ fontSize: '24px', fontWeight: '900', color: '#F0EDE8', letterSpacing: '-0.3px', marginBottom: '5px' }}>{restaurant.name}</div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                          <MapPin size={12} color="#FF5C35" />
-                          <span style={{ fontSize: '12px', color: '#555' }}>{restaurant.address} · {restaurant.neighborhood}</span>
-                        </div>
-                      </div>
-
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '6px', marginBottom: '14px' }}>
-                        {[
-                          { icon: <Star size={12} />, val: restaurant.rating, sub: 'rating', color: '#F59E0B' },
-                          { icon: <DollarSign size={12} />, val: '$'.repeat(restaurant.price), sub: 'price', color: '#22C55E' },
-                          { icon: <Clock size={12} />, val: restaurant.waitTime, sub: 'wait', color: '#60A5FA' },
-                          { icon: <Clock size={12} />, val: restaurant.hours.split(' - ')[1] || '10 PM', sub: 'closes', color: '#A78BFA' },
-                        ].map((st, si) => (
-                          <div key={si} style={{ background: '#141414', border: '1px solid #1E1E1E', borderRadius: '10px', padding: '9px 6px', textAlign: 'center' }}>
-                            <div style={{ color: st.color, display: 'flex', justifyContent: 'center', marginBottom: '4px' }}>{st.icon}</div>
-                            <div style={{ fontSize: '11px', fontWeight: '800', color: '#F0EDE8' }}>{st.val}</div>
-                            <div style={{ fontSize: '9px', color: '#333', marginTop: '2px' }}>{st.sub}</div>
-                          </div>
-                        ))}
-                      </div>
-
-                      <div style={{ background: '#141414', borderLeft: '2px solid #FF5C35', borderRadius: '0 10px 10px 0', padding: '11px 13px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '9px' }}>
-                        <Zap size={14} color="#FF5C35" />
-                        <div>
-                          <div style={{ fontSize: '9px', color: '#FF5C35', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '2px' }}>must try</div>
-                          <div style={{ fontSize: '14px', fontWeight: '700', color: '#F0EDE8' }}>{restaurant.specialty}</div>
-                        </div>
-                      </div>
-
-                      <div style={{ background: '#141414', border: '1px solid #1E1E1E', borderRadius: '10px', padding: '11px 13px', marginBottom: '14px' }}>
-                        <div style={{ fontSize: '9px', color: '#333', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: '700', marginBottom: '5px' }}>why this spot</div>
-                        <div style={{ fontSize: '12px', color: '#666', lineHeight: '1.6' }}>{reasoning}</div>
-                      </div>
-
-                      <div style={{ textAlign: 'center', marginBottom: '14px' }}>
-                        <a href={`tel:${restaurant.phone}`} style={{ fontSize: '12px', color: '#333', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
-                          <Phone size={12} />{restaurant.phone}
-                        </a>
-                      </div>
-
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        <button onClick={() => handleGoThere(restaurant)} style={{ flex: 2, background: '#FF5C35', color: '#fff', border: 'none', borderRadius: '12px', padding: '15px', fontSize: '14px', fontWeight: '800', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px' }}>
-                          <Navigation size={15} /> Take me there
-                        </button>
-                        <button onClick={() => { setPreferences({ vibe: null, cuisines: [], budget: null }); addMessage('bot', "Let's find another 🎯", 'vibe'); }} style={{ flex: 1, background: '#141414', color: '#555', border: '1px solid #1E1E1E', borderRadius: '12px', padding: '15px', fontSize: '13px', fontWeight: '700', cursor: 'pointer' }}>
-                          Try again
-                        </button>
-                      </div>
-
-                      <div style={{ textAlign: 'center', fontSize: '10px', color: '#2A2A2A', marginTop: '10px' }}>
-                        after you eat — vote. your score updates in real time 🔥
-                      </div>
-                    </div>
-                  </div>
-                );
-              })()}
+              {msg.component === 'result' && msg.data && (
+                <div>
+                  <div style={{ fontSize: '12px', color: '#444', marginBottom: '10px', textAlign: 'center' }}>your 2 picks in {msg.data.location}</div>
+                  {msg.data.restaurants.map((restaurant, ri) => (
+                    <RestaurantCard key={restaurant.id} restaurant={restaurant} msgScores={msg.data.liveScores} isFirst={ri === 0} />
+                  ))}
+                  <button
+                    onClick={() => { setPreferences({ vibe: null, cuisines: [], budget: null }); addMessage('bot', "Let's find another 🎯", 'vibe'); }}
+                    style={{ width: '100%', background: 'transparent', color: '#444', border: '1px solid #1E1E1E', borderRadius: '12px', padding: '13px', fontSize: '13px', fontWeight: '700', cursor: 'pointer', marginTop: '4px' }}
+                  >
+                    search again
+                  </button>
+                </div>
+              )}
 
             </div>
           ))}
@@ -390,7 +352,7 @@ const FoodDecider = () => {
           {isLoading && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', background: '#0F0F0F', border: '1px solid #1E1E1E', borderRadius: '14px' }}>
               <div style={{ width: '16px', height: '16px', border: '2px solid #FF5C35', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.7s linear infinite', flexShrink: 0 }} />
-              <span style={{ fontSize: '13px', color: '#444' }}>Finding your perfect spot...</span>
+              <span style={{ fontSize: '13px', color: '#444' }}>Finding your 2 best spots...</span>
             </div>
           )}
 
@@ -398,28 +360,35 @@ const FoodDecider = () => {
         </div>
       </div>
 
-      <div style={s.input}>
-        <div style={s.inputRow}>
+      <div style={{ background: '#0F0F0F', borderTop: '1px solid #1A1A1A', padding: '12px 16px 28px', flexShrink: 0 }}>
+        <div style={{ maxWidth: '460px', margin: '0 auto', display: 'flex', gap: '8px' }}>
           <input
+            ref={inputRef}
             type="text"
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyPress={e => e.key === 'Enter' && handleSend()}
             placeholder={!userLocation ? 'Type your location...' : 'Type a message...'}
-            style={s.inputField}
+            style={{ flex: 1, background: '#141414', border: '1px solid #242424', borderRadius: '12px', padding: '13px 16px', fontSize: '16px', color: '#F0EDE8', outline: 'none', WebkitAppearance: 'none' }}
           />
-          <button onClick={handleSend} style={s.sendBtn}>
-            <Send size={17} color="#fff" />
+          <button
+            onClick={handleSend}
+            style={{ background: '#FF5C35', border: 'none', borderRadius: '12px', padding: '13px 18px', cursor: 'pointer', fontSize: '18px', color: '#fff', fontWeight: '700', WebkitTapHighlightColor: 'transparent', flexShrink: 0 }}
+          >
+            ➤
           </button>
         </div>
-        <div style={s.inputHint}>🎯 one answer · 60 seconds · someone was just there</div>
+        <div style={{ textAlign: 'center', fontSize: '10px', color: '#2A2A2A', marginTop: '8px', letterSpacing: '0.04em' }}>
+          2 picks · 60 seconds · someone was just there
+        </div>
       </div>
 
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
-        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
-        * { box-sizing: border-box; }
-        button:active { opacity: 0.8; transform: scale(0.97); }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        button:active { opacity: 0.75; }
+        input::placeholder { color: #333; }
+        ::-webkit-scrollbar { display: none; }
       `}</style>
     </div>
   );
