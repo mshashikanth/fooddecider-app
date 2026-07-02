@@ -1,19 +1,19 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, UtensilsCrossed, ThumbsUp, MapPin, Star, DollarSign, Clock, Sparkles, Zap, Navigation, Phone, CheckCircle, XCircle } from 'lucide-react';
+import { Send, ThumbsUp, MapPin, Star, DollarSign, Clock, Navigation, Phone, Zap } from 'lucide-react';
 
 const SUPABASE_URL = 'YOUR_SUPABASE_URL';
 const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
 
 let supabase = null;
-try {
-  const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
-  supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-} catch(e) {}
+if (SUPABASE_URL !== 'YOUR_SUPABASE_URL') {
+  import('https://esm.sh/@supabase/supabase-js@2').then(({ createClient }) => {
+    supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  });
+}
 
 const FoodDecider = () => {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
-  const [stage, setStage] = useState('initial');
   const [userLocation, setUserLocation] = useState(null);
   const [preferences, setPreferences] = useState({ vibe: null, cuisines: [], budget: null });
   const [isLoading, setIsLoading] = useState(false);
@@ -30,422 +30,397 @@ const FoodDecider = () => {
     { name: 'Sushi', emoji: '🍣', type: 'japanese' },
     { name: 'Burgers', emoji: '🍔', type: 'american' },
     { name: 'Thai', emoji: '🍜', type: 'thai' },
-    { name: 'Indian', emoji: '🍛', type: 'indian' }
+    { name: 'Indian', emoji: '🍛', type: 'indian' },
   ];
 
   const restaurantDB = {
     mexican: [
-      { id: 'street-taco-stand', name: "Street Taco Stand", rating: 4.3, price: 1, specialty: "authentic street tacos", waitTime: "5-10 min", address: "456 Main St", phone: "(555) 111-2222", reviews: 523, vibe: "quick", hours: "11 AM - 9 PM", neighborhood: "Downtown" },
-      { id: 'taco-libre', name: "Taco Libre", rating: 4.8, price: 2, specialty: "birria tacos", waitTime: "10-15 min", address: "234 Mission St", phone: "(555) 234-5678", reviews: 847, vibe: "comfort", hours: "11 AM - 10 PM", neighborhood: "Mission District" },
-      { id: 'casa-de-oro', name: "Casa de Oro", rating: 4.7, price: 3, specialty: "molcajete mixto", waitTime: "25-30 min", address: "789 Sunset Blvd", phone: "(555) 333-4444", reviews: 612, vibe: "upscale", hours: "5 PM - 11 PM", neighborhood: "Uptown" }
+      { id: 'street-taco-stand', name: 'Street Taco Stand', rating: 4.3, price: 1, specialty: 'authentic street tacos', waitTime: '5-10 min', address: '456 Main St', phone: '(555) 111-2222', reviews: 523, vibe: 'quick', hours: '11 AM - 9 PM', neighborhood: 'Downtown' },
+      { id: 'taco-libre', name: 'Taco Libre', rating: 4.8, price: 2, specialty: 'birria tacos', waitTime: '10-15 min', address: '234 Mission St', phone: '(555) 234-5678', reviews: 847, vibe: 'comfort', hours: '11 AM - 10 PM', neighborhood: 'Mission District' },
+      { id: 'casa-de-oro', name: 'Casa de Oro', rating: 4.7, price: 3, specialty: 'molcajete mixto', waitTime: '25-30 min', address: '789 Sunset Blvd', phone: '(555) 333-4444', reviews: 612, vibe: 'upscale', hours: '5 PM - 11 PM', neighborhood: 'Uptown' },
     ],
     italian: [
-      { id: 'quick-slice-pizza', name: "Quick Slice Pizza", rating: 4.2, price: 1, specialty: "pepperoni slices", waitTime: "5 min", address: "321 Oak Ave", phone: "(555) 555-6666", reviews: 734, vibe: "quick", hours: "10 AM - 11 PM", neighborhood: "Downtown" },
-      { id: 'tonys-pizza-house', name: "Tony's Pizza House", rating: 4.4, price: 2, specialty: "NY-style pizza", waitTime: "10-15 min", address: "123 Broadway", phone: "(555) 678-9012", reviews: 956, vibe: "comfort", hours: "11 AM - 10 PM", neighborhood: "Midtown" },
-      { id: 'bella-trattoria', name: "Bella Trattoria", rating: 4.6, price: 3, specialty: "homemade pasta", waitTime: "30-40 min", address: "567 Pine St", phone: "(555) 777-8888", reviews: 421, vibe: "upscale", hours: "5 PM - 11 PM", neighborhood: "Italian Quarter" }
+      { id: 'quick-slice', name: 'Quick Slice Pizza', rating: 4.2, price: 1, specialty: 'pepperoni slices', waitTime: '5 min', address: '321 Oak Ave', phone: '(555) 555-6666', reviews: 734, vibe: 'quick', hours: '10 AM - 11 PM', neighborhood: 'Downtown' },
+      { id: 'tonys-pizza', name: "Tony's Pizza House", rating: 4.4, price: 2, specialty: 'NY-style pizza', waitTime: '10-15 min', address: '123 Broadway', phone: '(555) 678-9012', reviews: 956, vibe: 'comfort', hours: '11 AM - 10 PM', neighborhood: 'Midtown' },
+      { id: 'bella-trattoria', name: 'Bella Trattoria', rating: 4.6, price: 3, specialty: 'homemade pasta', waitTime: '30-40 min', address: '567 Pine St', phone: '(555) 777-8888', reviews: 421, vibe: 'upscale', hours: '5 PM - 11 PM', neighborhood: 'Italian Quarter' },
     ],
     japanese: [
-      { id: 'sushi-express', name: "Sushi Express", rating: 4.1, price: 1, specialty: "california rolls", waitTime: "10 min", address: "234 Elm St", phone: "(555) 999-0000", reviews: 645, vibe: "quick", hours: "11 AM - 9 PM", neighborhood: "Downtown" },
-      { id: 'ramen-station', name: "Ramen Station", rating: 4.6, price: 2, specialty: "tonkotsu ramen", waitTime: "15-20 min", address: "678 Post St", phone: "(555) 901-2345", reviews: 1089, vibe: "comfort", hours: "11 AM - 10 PM", neighborhood: "Japantown" },
-      { id: 'sakura-omakase', name: "Sakura Omakase", rating: 4.8, price: 3, specialty: "chef's omakase", waitTime: "45-60 min", address: "890 Cherry Ln", phone: "(555) 121-3141", reviews: 387, vibe: "upscale", hours: "6 PM - 11 PM", neighborhood: "Financial District" }
+      { id: 'sushi-express', name: 'Sushi Express', rating: 4.1, price: 1, specialty: 'california rolls', waitTime: '10 min', address: '234 Elm St', phone: '(555) 999-0000', reviews: 645, vibe: 'quick', hours: '11 AM - 9 PM', neighborhood: 'Downtown' },
+      { id: 'ramen-station', name: 'Ramen Station', rating: 4.6, price: 2, specialty: 'tonkotsu ramen', waitTime: '15-20 min', address: '678 Post St', phone: '(555) 901-2345', reviews: 1089, vibe: 'comfort', hours: '11 AM - 10 PM', neighborhood: 'Japantown' },
+      { id: 'sakura-omakase', name: 'Sakura Omakase', rating: 4.8, price: 3, specialty: "chef's omakase", waitTime: '45-60 min', address: '890 Cherry Ln', phone: '(555) 121-3141', reviews: 387, vibe: 'upscale', hours: '6 PM - 11 PM', neighborhood: 'Financial District' },
     ],
     american: [
-      { id: 'fast-burger-shack', name: "Fast Burger Shack", rating: 4.0, price: 1, specialty: "classic cheeseburger", waitTime: "8 min", address: "123 First St", phone: "(555) 151-6171", reviews: 892, vibe: "quick", hours: "10 AM - 10 PM", neighborhood: "Downtown" },
-      { id: 'the-burger-joint', name: "The Burger Joint", rating: 4.5, price: 2, specialty: "signature burgers", waitTime: "10-15 min", address: "890 Polk St", phone: "(555) 123-4567", reviews: 1432, vibe: "comfort", hours: "11 AM - 10 PM", neighborhood: "Castro" },
-      { id: 'gourmet-grill-house', name: "Gourmet Grill House", rating: 4.7, price: 3, specialty: "wagyu burger", waitTime: "20-25 min", address: "456 Market St", phone: "(555) 181-9202", reviews: 534, vibe: "upscale", hours: "5 PM - 11 PM", neighborhood: "SoMa" }
+      { id: 'fast-burger', name: 'Fast Burger Shack', rating: 4.0, price: 1, specialty: 'classic cheeseburger', waitTime: '8 min', address: '123 First St', phone: '(555) 151-6171', reviews: 892, vibe: 'quick', hours: '10 AM - 10 PM', neighborhood: 'Downtown' },
+      { id: 'burger-joint', name: 'The Burger Joint', rating: 4.5, price: 2, specialty: 'signature burgers', waitTime: '10-15 min', address: '890 Polk St', phone: '(555) 123-4567', reviews: 1432, vibe: 'comfort', hours: '11 AM - 10 PM', neighborhood: 'Castro' },
+      { id: 'gourmet-grill', name: 'Gourmet Grill House', rating: 4.7, price: 3, specialty: 'wagyu burger', waitTime: '20-25 min', address: '456 Market St', phone: '(555) 181-9202', reviews: 534, vibe: 'upscale', hours: '5 PM - 11 PM', neighborhood: 'SoMa' },
     ],
     thai: [
-      { id: 'thai-quick-bites', name: "Thai Quick Bites", rating: 4.2, price: 1, specialty: "pad thai", waitTime: "10 min", address: "789 Oak St", phone: "(555) 222-3333", reviews: 567, vibe: "quick", hours: "11 AM - 9 PM", neighborhood: "Chinatown" },
-      { id: 'thai-basil', name: "Thai Basil", rating: 4.6, price: 2, specialty: "green curry", waitTime: "15-20 min", address: "345 Market St", phone: "(555) 444-5555", reviews: 823, vibe: "comfort", hours: "11 AM - 10 PM", neighborhood: "Midtown" },
-      { id: 'royal-thai-cuisine', name: "Royal Thai Cuisine", rating: 4.8, price: 3, specialty: "royal platter", waitTime: "30-40 min", address: "567 Union St", phone: "(555) 666-7777", reviews: 445, vibe: "upscale", hours: "5 PM - 10 PM", neighborhood: "Nob Hill" }
+      { id: 'thai-quick', name: 'Thai Quick Bites', rating: 4.2, price: 1, specialty: 'pad thai', waitTime: '10 min', address: '789 Oak St', phone: '(555) 222-3333', reviews: 567, vibe: 'quick', hours: '11 AM - 9 PM', neighborhood: 'Chinatown' },
+      { id: 'thai-basil', name: 'Thai Basil', rating: 4.6, price: 2, specialty: 'green curry', waitTime: '15-20 min', address: '345 Market St', phone: '(555) 444-5555', reviews: 823, vibe: 'comfort', hours: '11 AM - 10 PM', neighborhood: 'Midtown' },
+      { id: 'royal-thai', name: 'Royal Thai Cuisine', rating: 4.8, price: 3, specialty: 'royal platter', waitTime: '30-40 min', address: '567 Union St', phone: '(555) 666-7777', reviews: 445, vibe: 'upscale', hours: '5 PM - 10 PM', neighborhood: 'Nob Hill' },
     ],
     indian: [
-      { id: 'curry-express', name: "Curry Express", rating: 4.1, price: 1, specialty: "chicken tikka masala", waitTime: "10 min", address: "234 Mission St", phone: "(555) 888-9999", reviews: 456, vibe: "quick", hours: "11 AM - 9 PM", neighborhood: "Downtown" },
-      { id: 'curry-house', name: "Curry House", rating: 4.5, price: 2, specialty: "butter chicken", waitTime: "20-25 min", address: "567 Divisadero St", phone: "(555) 678-9012", reviews: 634, vibe: "comfort", hours: "11 AM - 10 PM", neighborhood: "Haight" },
-      { id: 'tandoor-palace', name: "Tandoor Palace", rating: 4.7, price: 3, specialty: "tandoori platter", waitTime: "25-30 min", address: "890 Union St", phone: "(555) 789-0123", reviews: 445, vibe: "upscale", hours: "5 PM - 11 PM", neighborhood: "Marina" }
-    ]
+      { id: 'curry-express', name: 'Curry Express', rating: 4.1, price: 1, specialty: 'chicken tikka masala', waitTime: '10 min', address: '234 Mission St', phone: '(555) 888-9999', reviews: 456, vibe: 'quick', hours: '11 AM - 9 PM', neighborhood: 'Downtown' },
+      { id: 'curry-house', name: 'Curry House', rating: 4.5, price: 2, specialty: 'butter chicken', waitTime: '20-25 min', address: '567 Divisadero St', phone: '(555) 678-9012', reviews: 634, vibe: 'comfort', hours: '11 AM - 10 PM', neighborhood: 'Haight' },
+      { id: 'tandoor-palace', name: 'Tandoor Palace', rating: 4.7, price: 3, specialty: 'tandoori platter', waitTime: '25-30 min', address: '890 Union St', phone: '(555) 789-0123', reviews: 445, vibe: 'upscale', hours: '5 PM - 11 PM', neighborhood: 'Marina' },
+    ],
   };
 
   const fetchLiveScore = async (restaurantId) => {
-    if (!supabase || SUPABASE_URL === 'YOUR_SUPABASE_URL') return null;
+    if (!supabase) return null;
     try {
-      const { data } = await supabase
-        .from('votes')
-        .select('worth_it, created_at')
-        .eq('restaurant_id', restaurantId)
-        .order('created_at', { ascending: false })
-        .limit(50);
+      const { data } = await supabase.from('votes').select('worth_it, created_at').eq('restaurant_id', restaurantId).order('created_at', { ascending: false }).limit(50);
       if (!data || data.length === 0) return null;
-      const worthIt = data.filter(v => v.worth_it).length;
-      const pct = Math.round((worthIt / data.length) * 100);
-      const latest = new Date(data[0].created_at);
-      const diffMin = Math.floor((Date.now() - latest) / 60000);
-      let freshness = 'recently voted';
-      if (diffMin < 1) freshness = 'voted just now';
-      else if (diffMin < 60) freshness = `voted ${diffMin} min ago`;
-      else freshness = `voted ${Math.floor(diffMin / 60)}h ago`;
-      return { pct, freshness, total: data.length };
-    } catch (e) { return null; }
+      const pct = Math.round((data.filter(v => v.worth_it).length / data.length) * 100);
+      const diffMin = Math.floor((Date.now() - new Date(data[0].created_at)) / 60000);
+      const freshness = diffMin < 1 ? 'just now' : diffMin < 60 ? `${diffMin} min ago` : `${Math.floor(diffMin / 60)}h ago`;
+      return { pct, freshness };
+    } catch { return null; }
   };
 
   const submitVote = async (worthIt) => {
     if (!voteScreen) return;
-    if (supabase && SUPABASE_URL !== 'YOUR_SUPABASE_URL') {
+    if (supabase) {
       try {
-        await supabase.from('votes').insert({
-          restaurant_id: voteScreen.restaurantId,
-          dish_name: voteScreen.dish,
-          worth_it: worthIt,
-          created_at: new Date().toISOString()
-        });
-      } catch (e) { console.log('Vote error:', e); }
+        await supabase.from('votes').insert({ restaurant_id: voteScreen.restaurantId, dish_name: voteScreen.dish, worth_it: worthIt, created_at: new Date().toISOString() });
+      } catch (e) { console.log(e); }
     }
     setVoteSubmitted(true);
     setTimeout(() => { setVoteScreen(null); setVoteSubmitted(false); }, 2500);
   };
 
   const addMessage = useCallback((type, content, component = null, data = null) => {
-    setMessages(prev => [...prev, { type, content, component, data, timestamp: Date.now() }]);
+    setMessages(prev => [...prev, { type, content, component, data }]);
   }, []);
 
   useEffect(() => {
     if (!initialized) {
-      addMessage('assistant', "Hey! 👋 Let's find you the perfect spot to eat.");
-      setTimeout(() => {
-        addMessage('assistant', "Where are you? (City or neighborhood) 📍", 'location-input');
-      }, 800);
+      addMessage('bot', "Hey! 👋 Let's find you the perfect spot to eat.");
+      setTimeout(() => addMessage('bot', 'Where are you? (City or neighborhood)', 'location'), 800);
       setInitialized(true);
     }
   }, [initialized, addMessage]);
 
   useEffect(() => {
-    if (messages.length > 0 && messages[messages.length - 1].component === 'recommendation') {
-      setTimeout(() => { resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 100);
+    if (messages.length > 0 && messages[messages.length - 1].component === 'result') {
+      setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
     } else {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages]);
 
-  const handleLocationSubmit = (location) => {
-    setUserLocation(location);
-    setStage('vibe-select');
-    addMessage('user', location);
-    setTimeout(() => {
-      addMessage('assistant', `Perfect! I know great spots in ${location} 🎯\n\nWhat's your vibe?`, 'vibe-selector');
-    }, 600);
+  const handleLocation = (loc) => {
+    setUserLocation(loc);
+    addMessage('user', loc);
+    setTimeout(() => addMessage('bot', `Perfect! I know great spots in ${loc} 🎯\n\nWhat's your vibe?`, 'vibe'), 600);
   };
 
-  const handleVibeSelection = (vibe) => {
-    setPreferences(prev => ({ ...prev, vibe }));
-    setStage('cuisine-select');
-    const responses = { 'Quick & Easy': "Love it! Speed is key 🏃‍♂️", 'Adventure': "Bold choice! 🌟", 'Comfort': "Cozy vibes! 🛋️", 'Treat Myself': "Yes! 👑" };
-    addMessage('assistant', responses[vibe]);
-    setTimeout(() => { addMessage('assistant', "What type of food sounds good?", 'cuisine-selector'); }, 600);
+  const handleVibe = (vibe) => {
+    setPreferences(p => ({ ...p, vibe }));
+    const r = { 'Quick & Easy': 'Love it! Speed is key ⚡', Adventure: 'Bold choice! 🌟', Comfort: 'Cozy vibes! 🛋️', 'Treat Myself': 'You deserve it! 👑' };
+    addMessage('bot', r[vibe]);
+    setTimeout(() => addMessage('bot', 'What type of food sounds good?', 'cuisine'), 600);
   };
 
-  const handleCuisineReaction = (cuisine) => {
-    setPreferences(prev => ({ ...prev, cuisines: [...prev.cuisines, cuisine.type] }));
-    setStage('budget-select');
-    addMessage('assistant', `${cuisine.emoji} ${cuisine.name}! Great choice!`);
-    setTimeout(() => { addMessage('assistant', "What's your budget? 💰", 'budget-selector'); }, 600);
+  const handleCuisine = (c) => {
+    setPreferences(p => ({ ...p, cuisines: [c.type] }));
+    addMessage('bot', `${c.emoji} ${c.name}! Great choice!`);
+    setTimeout(() => addMessage('bot', "What's your budget?", 'budget'), 600);
   };
 
-  const handleBudgetSelection = (budget) => {
-    setPreferences(prev => ({ ...prev, budget }));
-    setStage('decision');
-    const responses = { 1: "Perfect! 💪", 2: "Nice! 👌", 3: "Premium! 🎩" };
-    addMessage('assistant', responses[budget]);
+  const handleBudget = (b) => {
+    const currentVibe = preferences.vibe;
+    setPreferences(p => ({ ...p, budget: b }));
+    addMessage('bot', ['', 'Perfect! 💪', 'Nice! 👌', 'Premium! 🎩'][b]);
     setTimeout(() => {
       setIsLoading(true);
-      addMessage('assistant', "Finding your spot... ✨");
-      setTimeout(() => { setIsLoading(false); generateRecommendation(); }, 2000);
+      addMessage('bot', 'Finding your spot... ✨');
+      setTimeout(async () => {
+        setIsLoading(false);
+        const cuisineType = preferences.cuisines[0] || 'mexican';
+        const all = restaurantDB[cuisineType];
+        let filtered = all.filter(r => r.price === b);
+        if (!filtered.length) filtered = all.filter(r => r.price <= b);
+        if (!filtered.length) filtered = all;
+        const vibeMap = { 'Quick & Easy': 'quick', Adventure: 'adventure', Comfort: 'comfort', 'Treat Myself': 'upscale' };
+        let restaurant = filtered.find(r => r.vibe === vibeMap[currentVibe]) || filtered.sort((a, c) => c.rating - a.rating)[0];
+        const reasons = {
+          'Quick & Easy': `You wanted quick — ${restaurant.name} has super fast service (${restaurant.waitTime}) and great food.`,
+          Adventure: `For your adventurous spirit — ${restaurant.name} is rated ${restaurant.rating}⭐ and their ${restaurant.specialty} is legendary.`,
+          Comfort: `Perfect comfort vibes — ${restaurant.name}'s ${restaurant.specialty} is exactly what you need right now.`,
+          'Treat Myself': `You deserve this — ${restaurant.name} is a premium spot. Their ${restaurant.specialty} is something special.`,
+        };
+        let reasoning = reasons[currentVibe] || `${restaurant.name} matches your vibe perfectly.`;
+        if (b === 1) reasoning += ' Great value.';
+        if (b === 3) reasoning += ' Worth the splurge.';
+        const liveScore = await fetchLiveScore(restaurant.id);
+        if (liveScore) setLiveScores(prev => ({ ...prev, [restaurant.id]: liveScore }));
+        addMessage('bot', '', 'result', { restaurant, reasoning, location: userLocation, liveScore });
+      }, 1800);
     }, 500);
-  };
-
-  const generateRecommendation = async () => {
-    const cuisineType = preferences.cuisines[0] || 'mexican';
-    const allRestaurants = restaurantDB[cuisineType];
-    let filtered = allRestaurants.filter(r => r.price === preferences.budget);
-    if (filtered.length === 0) filtered = allRestaurants.filter(r => r.price <= preferences.budget);
-    if (filtered.length === 0) filtered = allRestaurants;
-    const vibeMapping = { 'Quick & Easy': 'quick', 'Adventure': 'adventure', 'Comfort': 'comfort', 'Treat Myself': 'upscale' };
-    const targetVibe = vibeMapping[preferences.vibe];
-    let restaurant = filtered.find(r => r.vibe === targetVibe);
-    if (!restaurant) restaurant = filtered.sort((a, b) => b.rating - a.rating)[0];
-    let reasoning = '';
-    if (preferences.vibe === 'Quick & Easy') reasoning = `You wanted quick! ${restaurant.name} has super fast service (${restaurant.waitTime}) and great food.`;
-    else if (preferences.vibe === 'Adventure') reasoning = `For your adventurous spirit! ${restaurant.name} has amazing ratings (${restaurant.rating}⭐) and their ${restaurant.specialty} is legendary!`;
-    else if (preferences.vibe === 'Comfort') reasoning = `Perfect comfort food vibes! ${restaurant.name}'s ${restaurant.specialty} is exactly what you need.`;
-    else reasoning = `You deserve this! ${restaurant.name} is a premium spot with excellent ratings (${restaurant.rating}⭐). Their ${restaurant.specialty} is special!`;
-    if (preferences.budget === 1) reasoning += ` Great value!`;
-    else if (preferences.budget === 3) reasoning += ` Worth the splurge!`;
-    const liveScore = await fetchLiveScore(restaurant.id);
-    if (liveScore) setLiveScores(prev => ({ ...prev, [restaurant.id]: liveScore }));
-    addMessage('assistant', '', 'recommendation', { restaurant, reasoning, location: userLocation, liveScore });
-  };
-
-  const handleSend = () => {
-    if (!input.trim()) return;
-    addMessage('user', input);
-    if (!userLocation) handleLocationSubmit(input);
-    setInput('');
   };
 
   const handleGoThere = (restaurant) => {
     window.open(`https://maps.google.com/?q=${encodeURIComponent(restaurant.name + ' ' + restaurant.address)}`, '_blank');
-    setTimeout(() => {
-      setVoteScreen({ restaurantId: restaurant.id, restaurantName: restaurant.name, dish: restaurant.specialty });
-    }, 3000);
+    setTimeout(() => setVoteScreen({ restaurantId: restaurant.id, restaurantName: restaurant.name, dish: restaurant.specialty }), 3000);
+  };
+
+  const handleSend = () => {
+    if (!input.trim()) return;
+    if (!userLocation) handleLocation(input.trim());
+    setInput('');
+  };
+
+  const s = {
+    page: { minHeight: '100vh', display: 'flex', flexDirection: 'column', background: '#080808', fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif', color: '#F0EDE8' },
+    header: { background: '#0F0F0F', borderBottom: '1px solid #1A1A1A', padding: '18px 20px', textAlign: 'center', flexShrink: 0 },
+    headerTitle: { fontSize: '26px', fontWeight: '900', color: '#FF5C35', letterSpacing: '-0.5px', margin: 0 },
+    headerSub: { fontSize: '11px', color: '#333', marginTop: '3px', textTransform: 'uppercase', letterSpacing: '0.08em' },
+    messages: { flex: 1, overflowY: 'auto', padding: '16px' },
+    inner: { maxWidth: '460px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '10px' },
+    botBubble: { background: '#141414', border: '1px solid #1E1E1E', borderRadius: '16px 16px 16px 4px', padding: '12px 16px', fontSize: '14px', color: '#D0CCC8', maxWidth: '85%', whiteSpace: 'pre-line', lineHeight: '1.5' },
+    userBubble: { background: '#FF5C35', borderRadius: '16px 16px 4px 16px', padding: '12px 16px', fontSize: '14px', color: '#fff', fontWeight: '600', maxWidth: '80%', alignSelf: 'flex-end' },
+    card: { background: '#0F0F0F', border: '1px solid #1E1E1E', borderRadius: '16px', padding: '16px' },
+    cardTitle: { fontSize: '14px', color: '#D0CCC8', marginBottom: '12px', lineHeight: '1.5', whiteSpace: 'pre-line' },
+    grid2: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' },
+    grid3: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' },
+    vibeBtn: { background: '#141414', border: '1px solid #242424', borderRadius: '12px', padding: '16px 10px', cursor: 'pointer', textAlign: 'center', transition: 'border-color 0.15s' },
+    cuisineBtn: { background: '#141414', border: '1px solid #242424', borderRadius: '12px', padding: '14px 8px', cursor: 'pointer', textAlign: 'center' },
+    budgetBtn: { background: '#141414', border: '1px solid #242424', borderRadius: '12px', padding: '18px 8px', cursor: 'pointer', textAlign: 'center' },
+    input: { background: '#0F0F0F', borderTop: '1px solid #1A1A1A', padding: '14px 16px', flexShrink: 0 },
+    inputRow: { maxWidth: '460px', margin: '0 auto', display: 'flex', gap: '8px' },
+    inputField: { flex: 1, background: '#141414', border: '1px solid #242424', borderRadius: '12px', padding: '13px 16px', fontSize: '14px', color: '#F0EDE8', outline: 'none' },
+    sendBtn: { background: '#FF5C35', border: 'none', borderRadius: '12px', padding: '13px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+    inputHint: { textAlign: 'center', fontSize: '11px', color: '#2A2A2A', marginTop: '8px', letterSpacing: '0.04em' },
+    overlay: { position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(0,0,0,0.92)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' },
+    voteCard: { background: '#0F0F0F', border: '1px solid #1E1E1E', borderRadius: '24px', padding: '28px 22px', maxWidth: '340px', width: '100%' },
+    voteTitle: { fontSize: '22px', fontWeight: '900', color: '#F0EDE8', textAlign: 'center', marginBottom: '6px' },
+    voteSub: { fontSize: '12px', color: '#444', textAlign: 'center', marginBottom: '20px' },
+    voteDish: { background: '#141414', border: '1px solid #1E1E1E', borderRadius: '12px', padding: '12px 14px', marginBottom: '18px', display: 'flex', gap: '10px', alignItems: 'center' },
+    voteButtons: { display: 'flex', gap: '10px' },
+    worthItBtn: { flex: 1, background: '#0D2B1A', border: '1px solid #22C55E', color: '#22C55E', borderRadius: '12px', padding: '15px', fontSize: '15px', fontWeight: '800', cursor: 'pointer' },
+    notQuiteBtn: { flex: 1, background: '#2B0D0D', border: '1px solid #EF4444', color: '#EF4444', borderRadius: '12px', padding: '15px', fontSize: '15px', fontWeight: '800', cursor: 'pointer' },
   };
 
   return (
-    <div className="min-h-screen w-full flex flex-col bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-100">
+    <div style={s.page}>
 
       {voteScreen && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-6">
-          <div className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl">
+        <div style={s.overlay}>
+          <div style={s.voteCard}>
             {!voteSubmitted ? (
               <>
-                <div className="text-center mb-6">
-                  <div className="text-5xl mb-3">🍽️</div>
-                  <h2 className="text-2xl font-black text-gray-900 mb-2">How was it?</h2>
-                  <p className="text-gray-500 text-sm">One tap — takes 2 seconds</p>
-                </div>
-                <div className="bg-gray-50 rounded-2xl p-4 mb-6 flex items-center gap-3">
-                  <div className="text-2xl">⚡</div>
+                <div style={{ textAlign: 'center', marginBottom: '6px', fontSize: '40px' }}>🍽️</div>
+                <div style={s.voteTitle}>How was it?</div>
+                <div style={s.voteSub}>One tap · takes 2 seconds</div>
+                <div style={s.voteDish}>
+                  <span style={{ fontSize: '20px' }}>⚡</span>
                   <div>
-                    <div className="font-bold text-gray-900 text-sm">{voteScreen.dish}</div>
-                    <div className="text-gray-500 text-xs">{voteScreen.restaurantName}</div>
+                    <div style={{ fontSize: '14px', fontWeight: '700', color: '#F0EDE8' }}>{voteScreen.dish}</div>
+                    <div style={{ fontSize: '12px', color: '#444', marginTop: '2px' }}>{voteScreen.restaurantName}</div>
                   </div>
                 </div>
-                <div className="flex gap-3">
-                  <button onClick={() => submitVote(true)} className="flex-1 bg-gradient-to-r from-emerald-400 to-teal-500 text-white py-4 rounded-2xl font-black text-lg flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-transform">
-                    ✓ Worth it
-                  </button>
-                  <button onClick={() => submitVote(false)} className="flex-1 bg-gradient-to-r from-rose-400 to-red-500 text-white py-4 rounded-2xl font-black text-lg flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-transform">
-                    ✗ Not quite
-                  </button>
+                <div style={s.voteButtons}>
+                  <button style={s.worthItBtn} onClick={() => submitVote(true)}>✓ Worth it</button>
+                  <button style={s.notQuiteBtn} onClick={() => submitVote(false)}>✗ Not quite</button>
                 </div>
-                <p className="text-center text-xs text-gray-400 mt-4">your vote updates the score in real time</p>
+                <div style={{ textAlign: 'center', fontSize: '11px', color: '#2A2A2A', marginTop: '12px' }}>your vote updates the score in real time</div>
               </>
             ) : (
-              <div className="text-center py-6">
-                <div className="text-6xl mb-4">✅</div>
-                <h2 className="text-2xl font-black text-gray-900 mb-2">Logged!</h2>
-                <p className="text-gray-500">Score updated. You helped the next person decide.</p>
+              <div style={{ textAlign: 'center', padding: '16px 0' }}>
+                <div style={{ fontSize: '48px', marginBottom: '12px' }}>✅</div>
+                <div style={{ fontSize: '20px', fontWeight: '900', color: '#F0EDE8', marginBottom: '6px' }}>Logged!</div>
+                <div style={{ fontSize: '13px', color: '#444', lineHeight: '1.6' }}>Score updated.<br />You helped the next person decide.</div>
               </div>
             )}
           </div>
         </div>
       )}
 
-      <div className="w-full bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 shadow-2xl px-4 sm:px-6 py-6">
-        <div className="flex items-center justify-center gap-4">
-          <div className="bg-white/20 backdrop-blur-sm p-3 rounded-2xl shadow-xl border-2 border-white/30">
-            <UtensilsCrossed className="w-8 h-8 text-white" />
-          </div>
-          <div className="text-center">
-            <h1 className="text-3xl sm:text-4xl font-black text-white drop-shadow-lg">Bitten60</h1>
-            <p className="text-sm text-white/90 font-medium drop-shadow">One answer. 60 seconds. Worth it.</p>
-          </div>
-        </div>
+      <div style={s.header}>
+        <div style={s.headerTitle}>Bitten60</div>
+        <div style={s.headerSub}>one answer · 60 seconds · worth it</div>
       </div>
 
-      <div className="flex-1 w-full overflow-y-auto px-4 sm:px-6 py-6 flex justify-center">
-        <div className="w-full max-w-4xl space-y-6">
-          {messages.map((message, idx) => (
-            <div key={idx} ref={message.component === 'recommendation' ? resultRef : null} className="flex w-full justify-center">
-              <div className={`w-full max-w-3xl rounded-2xl px-6 py-4 shadow-xl transition-all ${message.type === 'user' ? 'bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 text-white text-center' : 'bg-white text-gray-800 border border-indigo-100'}`}>
-                <div className="font-medium leading-relaxed whitespace-pre-line text-center">{message.content}</div>
+      <div style={s.messages}>
+        <div style={s.inner}>
+          {messages.map((msg, i) => (
+            <div key={i} ref={msg.component === 'result' ? resultRef : null} style={{ display: 'flex', flexDirection: 'column' }}>
 
-                {message.component === 'location-input' && (
-                  <div className="mt-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 border-2 border-indigo-200">
-                    <p className="text-sm text-gray-700 font-medium text-center">Type your city or neighborhood below ⬇️</p>
-                    <p className="text-xs text-gray-500 mt-1 text-center">Examples: "Culver City", "Downtown LA", "Brooklyn"</p>
+              {msg.type === 'user' && <div style={s.userBubble}>{msg.content}</div>}
+
+              {msg.type === 'bot' && !msg.component && msg.content && (
+                <div style={s.botBubble}>{msg.content}</div>
+              )}
+
+              {msg.component === 'location' && (
+                <div style={s.card}>
+                  <div style={s.cardTitle}>{msg.content}</div>
+                  <div style={{ background: '#141414', border: '1px solid #242424', borderRadius: '10px', padding: '12px 14px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '13px', color: '#444' }}>Type your city or neighborhood below</div>
+                    <div style={{ fontSize: '11px', color: '#2A2A2A', marginTop: '4px' }}>"Culver City" · "Downtown LA" · "Brooklyn"</div>
                   </div>
-                )}
+                </div>
+              )}
 
-                {message.component === 'vibe-selector' && (
-                  <div className="mt-5 grid grid-cols-2 gap-4 max-w-2xl mx-auto">
+              {msg.component === 'vibe' && (
+                <div style={s.card}>
+                  <div style={s.cardTitle}>{msg.content}</div>
+                  <div style={s.grid2}>
                     {[
-                      { name: 'Quick & Easy', emoji: '⚡', gradient: 'from-cyan-400 via-blue-400 to-indigo-500' },
-                      { name: 'Adventure', emoji: '🌟', gradient: 'from-purple-500 via-pink-500 to-rose-500' },
-                      { name: 'Comfort', emoji: '🛋️', gradient: 'from-blue-400 via-indigo-400 to-purple-500' },
-                      { name: 'Treat Myself', emoji: '👑', gradient: 'from-violet-500 via-purple-500 to-fuchsia-500' }
-                    ].map((vibe) => (
-                      <button key={vibe.name} onClick={() => handleVibeSelection(vibe.name)} className={`bg-gradient-to-r ${vibe.gradient} text-white py-6 px-5 rounded-2xl font-bold shadow-lg hover:shadow-2xl transition-all transform hover:scale-105 active:scale-95`}>
-                        <div className="flex flex-col items-center gap-2">
-                          <span className="text-4xl">{vibe.emoji}</span>
-                          <span className="text-lg">{vibe.name}</span>
-                        </div>
+                      { name: 'Quick & Easy', emoji: '⚡' },
+                      { name: 'Adventure', emoji: '🌟' },
+                      { name: 'Comfort', emoji: '🛋️' },
+                      { name: 'Treat Myself', emoji: '👑' },
+                    ].map(v => (
+                      <button key={v.name} style={s.vibeBtn} onClick={() => handleVibe(v.name)}>
+                        <div style={{ fontSize: '26px', marginBottom: '6px' }}>{v.emoji}</div>
+                        <div style={{ fontSize: '12px', fontWeight: '700', color: '#D0CCC8' }}>{v.name}</div>
                       </button>
                     ))}
                   </div>
-                )}
+                </div>
+              )}
 
-                {message.component === 'cuisine-selector' && (
-                  <div className="mt-5 flex flex-wrap justify-center gap-3 max-w-4xl mx-auto">
-                    {cuisineOptions.map((cuisine) => (
-                      <div key={cuisine.type} className="bg-gradient-to-br from-white to-indigo-50 rounded-2xl p-4 border-2 border-indigo-200 shadow-md hover:shadow-xl hover:border-indigo-400 transition-all transform hover:scale-105 w-28">
-                        <div className="text-center mb-2">
-                          <span className="text-5xl">{cuisine.emoji}</span>
-                          <div className="font-bold text-sm mt-2 text-gray-800">{cuisine.name}</div>
+              {msg.component === 'cuisine' && (
+                <div style={s.card}>
+                  <div style={s.cardTitle}>{msg.content}</div>
+                  <div style={s.grid3}>
+                    {cuisineOptions.map(c => (
+                      <button key={c.type} style={s.cuisineBtn} onClick={() => handleCuisine(c)}>
+                        <div style={{ fontSize: '26px', marginBottom: '6px' }}>{c.emoji}</div>
+                        <div style={{ fontSize: '11px', fontWeight: '600', color: '#D0CCC8' }}>{c.name}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {msg.component === 'budget' && (
+                <div style={s.card}>
+                  <div style={s.cardTitle}>{msg.content}</div>
+                  <div style={s.grid3}>
+                    {[{ v: 1, l: 'Under $15', sym: '$' }, { v: 2, l: '$15–30', sym: '$$' }, { v: 3, l: '$30+', sym: '$$$' }].map(b => (
+                      <button key={b.v} style={s.budgetBtn} onClick={() => handleBudget(b.v)}>
+                        <div style={{ fontSize: '18px', fontWeight: '900', color: '#FF5C35', marginBottom: '4px' }}>{b.sym}</div>
+                        <div style={{ fontSize: '10px', color: '#555' }}>{b.l}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {msg.component === 'result' && msg.data && (() => {
+                const { restaurant, reasoning, liveScore } = msg.data;
+                const score = liveScore || liveScores[restaurant.id];
+                return (
+                  <div style={{ background: '#0F0F0F', border: '1px solid #1E1E1E', borderRadius: '20px', overflow: 'hidden' }}>
+
+                    <div style={{ background: score ? '#051A0E' : '#0A0A14', borderBottom: '1px solid #1E1E1E', padding: '11px 16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                      <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: score ? '#22C55E' : '#2A2A2A', animation: 'pulse 1.5s infinite' }} />
+                      <span style={{ fontSize: '12px', fontWeight: '700', color: score ? '#22C55E' : '#333' }}>
+                        {score ? `${score.pct}% worth it · voted ${score.freshness}` : 'Be the first to vote after visiting'}
+                      </span>
+                    </div>
+
+                    <div style={{ padding: '18px' }}>
+
+                      <div style={{ marginBottom: '14px' }}>
+                        <div style={{ fontSize: '24px', fontWeight: '900', color: '#F0EDE8', letterSpacing: '-0.3px', marginBottom: '5px' }}>{restaurant.name}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                          <MapPin size={12} color="#FF5C35" />
+                          <span style={{ fontSize: '12px', color: '#555' }}>{restaurant.address} · {restaurant.neighborhood}</span>
                         </div>
-                        <button onClick={() => handleCuisineReaction(cuisine)} className="w-full bg-gradient-to-r from-blue-500 to-indigo-500 text-white py-2 rounded-xl font-bold text-xs shadow-lg transition-all transform active:scale-95 flex items-center justify-center gap-1">
-                          <ThumbsUp className="w-3 h-3" /> Pick
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '6px', marginBottom: '14px' }}>
+                        {[
+                          { icon: <Star size={12} />, val: restaurant.rating, sub: 'rating', color: '#F59E0B' },
+                          { icon: <DollarSign size={12} />, val: '$'.repeat(restaurant.price), sub: 'price', color: '#22C55E' },
+                          { icon: <Clock size={12} />, val: restaurant.waitTime, sub: 'wait', color: '#60A5FA' },
+                          { icon: <Clock size={12} />, val: restaurant.hours.split(' - ')[1] || '10 PM', sub: 'closes', color: '#A78BFA' },
+                        ].map((st, si) => (
+                          <div key={si} style={{ background: '#141414', border: '1px solid #1E1E1E', borderRadius: '10px', padding: '9px 6px', textAlign: 'center' }}>
+                            <div style={{ color: st.color, display: 'flex', justifyContent: 'center', marginBottom: '4px' }}>{st.icon}</div>
+                            <div style={{ fontSize: '11px', fontWeight: '800', color: '#F0EDE8' }}>{st.val}</div>
+                            <div style={{ fontSize: '9px', color: '#333', marginTop: '2px' }}>{st.sub}</div>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div style={{ background: '#141414', borderLeft: '2px solid #FF5C35', borderRadius: '0 10px 10px 0', padding: '11px 13px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '9px' }}>
+                        <Zap size={14} color="#FF5C35" />
+                        <div>
+                          <div style={{ fontSize: '9px', color: '#FF5C35', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '2px' }}>must try</div>
+                          <div style={{ fontSize: '14px', fontWeight: '700', color: '#F0EDE8' }}>{restaurant.specialty}</div>
+                        </div>
+                      </div>
+
+                      <div style={{ background: '#141414', border: '1px solid #1E1E1E', borderRadius: '10px', padding: '11px 13px', marginBottom: '14px' }}>
+                        <div style={{ fontSize: '9px', color: '#333', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: '700', marginBottom: '5px' }}>why this spot</div>
+                        <div style={{ fontSize: '12px', color: '#666', lineHeight: '1.6' }}>{reasoning}</div>
+                      </div>
+
+                      <div style={{ textAlign: 'center', marginBottom: '14px' }}>
+                        <a href={`tel:${restaurant.phone}`} style={{ fontSize: '12px', color: '#333', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
+                          <Phone size={12} />{restaurant.phone}
+                        </a>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button onClick={() => handleGoThere(restaurant)} style={{ flex: 2, background: '#FF5C35', color: '#fff', border: 'none', borderRadius: '12px', padding: '15px', fontSize: '14px', fontWeight: '800', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px' }}>
+                          <Navigation size={15} /> Take me there
+                        </button>
+                        <button onClick={() => { setPreferences({ vibe: null, cuisines: [], budget: null }); addMessage('bot', "Let's find another 🎯", 'vibe'); }} style={{ flex: 1, background: '#141414', color: '#555', border: '1px solid #1E1E1E', borderRadius: '12px', padding: '15px', fontSize: '13px', fontWeight: '700', cursor: 'pointer' }}>
+                          Try again
                         </button>
                       </div>
-                    ))}
-                  </div>
-                )}
 
-                {message.component === 'budget-selector' && (
-                  <div className="mt-5 grid grid-cols-3 gap-4 max-w-2xl mx-auto">
-                    {[
-                      { v: 1, l: 'Under $15', sym: '$', color: 'from-emerald-400 via-teal-400 to-cyan-500' },
-                      { v: 2, l: '$15-30', sym: '$$', color: 'from-blue-400 via-indigo-400 to-violet-500' },
-                      { v: 3, l: '$30+', sym: '$$$', color: 'from-purple-400 via-fuchsia-400 to-pink-500' }
-                    ].map((b) => (
-                      <button key={b.v} onClick={() => handleBudgetSelection(b.v)} className={`bg-gradient-to-br ${b.color} text-white py-6 rounded-2xl font-bold shadow-lg hover:shadow-2xl transition-all transform hover:scale-110 active:scale-95`}>
-                        <div className="flex flex-col items-center gap-2">
-                          <span className="text-4xl">{b.sym}</span>
-                          <span className="text-sm font-semibold">{b.l}</span>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                {message.component === 'recommendation' && message.data && (() => {
-                  const { restaurant, reasoning, location, liveScore } = message.data;
-                  const score = liveScore || liveScores[restaurant.id];
-                  return (
-                    <div className="mt-6">
-                      <div className="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 rounded-3xl p-6 sm:p-8 border-4 border-indigo-400 shadow-2xl">
-
-                        {score ? (
-                          <div className="flex items-center justify-center gap-2 mb-4">
-                            <div className="flex items-center gap-2 bg-emerald-500 text-white px-4 py-2 rounded-full shadow-lg">
-                              <div className="w-2 h-2 rounded-full bg-white animate-pulse"></div>
-                              <span className="font-bold text-sm">{score.pct}% worth it · {score.freshness}</span>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="flex items-center justify-center gap-2 mb-4">
-                            <div className="flex items-center gap-2 bg-indigo-100 text-indigo-600 px-4 py-2 rounded-full">
-                              <div className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse"></div>
-                              <span className="font-semibold text-sm">Be the first to vote after visiting</span>
-                            </div>
-                          </div>
-                        )}
-
-                        <div className="text-center mb-6">
-                          <div className="flex items-center justify-center gap-3 mb-4">
-                            <Sparkles className="w-10 h-10 text-yellow-500 animate-pulse" />
-                            <h3 className="text-3xl font-black bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">Perfect Match!</h3>
-                            <Sparkles className="w-10 h-10 text-yellow-500 animate-pulse" />
-                          </div>
-                          <h2 className="text-4xl sm:text-5xl font-black text-gray-900 mb-3">{restaurant.name}</h2>
-                          <div className="flex flex-col items-center gap-1 text-gray-600">
-                            <div className="flex items-center gap-2">
-                              <MapPin className="w-5 h-5 text-indigo-500" />
-                              <span className="font-semibold">{restaurant.address}</span>
-                            </div>
-                            <span className="text-sm font-medium text-gray-500">
-                              {restaurant.neighborhood !== location ? `${restaurant.neighborhood}, ${location}` : location}
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="bg-white rounded-2xl p-6 mb-6 shadow-xl">
-                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-                            <div className="bg-gradient-to-br from-yellow-50 to-amber-50 px-4 py-4 rounded-xl border-2 border-yellow-300 text-center">
-                              <Star className="w-6 h-6 fill-yellow-500 text-yellow-500 mx-auto mb-2" />
-                              <div className="font-black text-2xl text-gray-800">{restaurant.rating}</div>
-                              <p className="text-xs text-gray-600 mt-1">{restaurant.reviews} reviews</p>
-                            </div>
-                            <div className="bg-gradient-to-br from-emerald-50 to-teal-50 px-4 py-4 rounded-xl border-2 border-emerald-300 text-center">
-                              <DollarSign className="w-6 h-6 text-emerald-600 mx-auto mb-2" />
-                              <div className="font-black text-2xl text-gray-800">{'$'.repeat(restaurant.price)}</div>
-                              <p className="text-xs text-gray-600 mt-1">Price</p>
-                            </div>
-                            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 px-4 py-4 rounded-xl border-2 border-blue-300 text-center">
-                              <Clock className="w-6 h-6 text-blue-600 mx-auto mb-2" />
-                              <div className="font-black text-lg text-gray-800">{restaurant.waitTime}</div>
-                              <p className="text-xs text-gray-600 mt-1">Wait time</p>
-                            </div>
-                            <div className="bg-gradient-to-br from-purple-50 to-fuchsia-50 px-4 py-4 rounded-xl border-2 border-purple-300 text-center">
-                              <Clock className="w-6 h-6 text-purple-600 mx-auto mb-2" />
-                              <div className="font-black text-sm text-gray-800">{restaurant.hours}</div>
-                              <p className="text-xs text-gray-600 mt-1">Open</p>
-                            </div>
-                          </div>
-
-                          <div className="bg-gradient-to-r from-indigo-50 via-purple-50 to-pink-50 border-l-4 border-indigo-500 p-5 rounded-xl mb-5 shadow-md">
-                            <p className="font-bold text-lg flex items-center gap-3 text-indigo-900">
-                              <Zap className="w-6 h-6 text-indigo-600 flex-shrink-0" />
-                              <span>Must Try: <span className="text-indigo-700">{restaurant.specialty}</span></span>
-                            </p>
-                          </div>
-
-                          <div className="bg-gray-50 rounded-xl p-4">
-                            <div className="flex items-center gap-3 text-sm justify-center">
-                              <Phone className="w-5 h-5 text-gray-600" />
-                              <a href={`tel:${restaurant.phone}`} className="font-semibold text-gray-800 hover:text-indigo-600 transition-colors">{restaurant.phone}</a>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 rounded-2xl p-5 mb-6 border-2 border-indigo-300 shadow-lg">
-                          <p className="font-medium leading-relaxed text-gray-800">
-                            <strong className="text-indigo-700 text-lg block mb-2">Why this spot:</strong>
-                            <span className="text-gray-700">{reasoning}</span>
-                          </p>
-                        </div>
-
-                        <div className="flex flex-col sm:flex-row gap-4">
-                          <button onClick={() => handleGoThere(restaurant)} className="flex-1 bg-gradient-to-r from-blue-500 via-indigo-600 to-purple-600 hover:from-blue-600 hover:via-indigo-700 hover:to-purple-700 text-white py-5 rounded-2xl font-black text-lg flex items-center justify-center gap-3 shadow-2xl transition-all transform hover:scale-105 active:scale-95">
-                            <Navigation className="w-6 h-6" /> Take me there
-                          </button>
-                          <button onClick={() => { setStage('vibe-select'); setPreferences({ vibe: null, cuisines: [], budget: null }); addMessage('assistant', "Let's find another! 🎯", 'vibe-selector'); }} className="flex-1 bg-gradient-to-r from-gray-100 to-gray-200 hover:from-gray-200 hover:to-gray-300 text-gray-800 py-5 rounded-2xl font-black text-lg shadow-xl border-2 border-gray-300 transition-all transform hover:scale-105 active:scale-95">
-                            Try Again 🔁
-                          </button>
-                        </div>
-                        <p className="text-center text-xs text-gray-400 mt-4">After you eat — vote. Your vote updates the score for the next person 🔥</p>
+                      <div style={{ textAlign: 'center', fontSize: '10px', color: '#2A2A2A', marginTop: '10px' }}>
+                        after you eat — vote. your score updates in real time 🔥
                       </div>
                     </div>
-                  );
-                })()}
-              </div>
+                  </div>
+                );
+              })()}
+
             </div>
           ))}
 
           {isLoading && (
-            <div className="flex justify-center w-full">
-              <div className="bg-white shadow-2xl rounded-2xl px-6 py-5 border-2 border-indigo-200 flex items-center gap-4">
-                <div className="animate-spin rounded-full h-8 w-8 border-4 border-indigo-500 border-t-transparent"></div>
-                <div>
-                  <span className="font-bold text-gray-800 block">Finding your perfect spot...</span>
-                  <span className="text-sm text-gray-600">Analyzing {preferences.vibe} vibes</span>
-                </div>
-              </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', background: '#0F0F0F', border: '1px solid #1E1E1E', borderRadius: '14px' }}>
+              <div style={{ width: '16px', height: '16px', border: '2px solid #FF5C35', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.7s linear infinite', flexShrink: 0 }} />
+              <span style={{ fontSize: '13px', color: '#444' }}>Finding your perfect spot...</span>
             </div>
           )}
+
           <div ref={messagesEndRef} />
         </div>
       </div>
 
-      <div className="w-full bg-white/95 backdrop-blur-md shadow-2xl px-4 sm:px-6 py-6 border-t-2 border-indigo-200">
-        <div className="max-w-2xl mx-auto">
-          <div className="flex gap-3 mb-3">
-            <input type="text" value={input} onChange={(e) => setInput(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && handleSend()} placeholder={!userLocation ? "Type your location..." : "Type a message..."} className="flex-1 px-6 py-4 border-2 border-indigo-300 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-300 focus:border-indigo-500 font-medium text-lg shadow-lg transition-all text-center" />
-            <button onClick={handleSend} disabled={isLoading} className="bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 hover:from-blue-600 hover:via-indigo-600 hover:to-purple-600 disabled:opacity-50 text-white px-8 py-4 rounded-2xl shadow-2xl font-bold transition-all transform hover:scale-105 active:scale-95">
-              <Send className="w-7 h-7" />
-            </button>
-          </div>
-          <p className="text-xs text-gray-500 text-center">🎯 One answer. 60 seconds. Someone was just there.</p>
+      <div style={s.input}>
+        <div style={s.inputRow}>
+          <input
+            type="text"
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyPress={e => e.key === 'Enter' && handleSend()}
+            placeholder={!userLocation ? 'Type your location...' : 'Type a message...'}
+            style={s.inputField}
+          />
+          <button onClick={handleSend} style={s.sendBtn}>
+            <Send size={17} color="#fff" />
+          </button>
         </div>
+        <div style={s.inputHint}>🎯 one answer · 60 seconds · someone was just there</div>
       </div>
+
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+        * { box-sizing: border-box; }
+        button:active { opacity: 0.8; transform: scale(0.97); }
+      `}</style>
     </div>
   );
 };
