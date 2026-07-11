@@ -351,3 +351,67 @@ const FoodDecider = () => {
                     const rating = place.rating;
                     const reviewCount = place.userRatingCount;
                     const price = PRICE_MAP[place.priceLevel] || '';
+                  const isOpen = place.regularOpeningHours?.openNow;
+
+                    return (
+                      <div key={place.id} style={W.restCard(isFirst)}>
+                        {isFirst && <div style={W.topPick}>TOP PICK</div>}
+                        <div style={W.restInner}>
+                          <div style={W.liveBadge(!!score)}>
+                            <div style={W.liveDot(!!score)} />
+                            <span style={W.liveText(!!score)}>
+                              {score ? `${score.pct}% worth it · voted ${score.freshness}` : 'be the first to vote after visiting'}
+                            </span>
+                          </div>
+                          <div style={W.restName}>{name}</div>
+                          <div style={W.restMeta}>
+                            📍 {address} · {isOpen ? '🟢 Open now' : '🔴 Closed'}
+                          </div>
+                          <div style={W.statsGrid}>
+                            {[
+                              { val: rating ? `${rating}★` : 'New', sub: reviewCount ? `${reviewCount} reviews` : 'no reviews yet', color: '#E8450A' },
+                              { val: price || '?', sub: 'price', color: '#22A05B' },
+                              { val: isOpen ? 'Open' : 'Closed', sub: 'right now', color: isOpen ? '#22A05B' : '#C4A898' },
+                            ].map((st, si) => (
+                              <div key={si} style={W.statBox(st.color)}>
+                                <div style={W.statVal(st.color)}>{st.val}</div>
+                                <div style={W.statSub}>{st.sub}</div>
+                              </div>
+                            ))}
+                          </div>
+                          <button onClick={() => handleGoThere(place)} style={W.takeBtn(isFirst)}>
+                            {isFirst ? '🗺️ Take me here' : '🗺️ Or go here instead'}
+                          </button>
+                          {place.internationalPhoneNumber && (
+                            <a href={`tel:${place.internationalPhoneNumber}`} style={W.phoneLink}>
+                              📞 {place.internationalPhoneNumber}
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  <button onClick={reset} style={{ ...W.ghostBtn, marginTop: '4px' }}>
+                    try a different vibe
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+        </div>
+      </div>
+
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        button:active { opacity: 0.8; transform: scale(0.98); }
+        input::placeholder { color: #C4A898; }
+        ::-webkit-scrollbar { display: none; }
+      `}</style>
+    </div>
+  );
+};
+
+export default FoodDecider;
