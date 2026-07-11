@@ -97,7 +97,7 @@ const FoodDecider = () => {
     setLocationLoading(true);
     setError(null);
     try {
-      const res = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(locationText)}&key=AIzaSyDUMMYKEYREPLACETHIS`);
+      const res = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(locationText)}&key=AIzaSyBQLTI-ujYowNSyuK-rgkZvvDkRyanbAi4`);
       const data = await res.json();
       if (data.results && data.results[0]) {
         const loc = data.results[0].geometry.location;
