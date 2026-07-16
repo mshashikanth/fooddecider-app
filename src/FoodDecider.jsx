@@ -10,381 +10,481 @@ if (SUPABASE_URL !== 'YOUR_SUPABASE_URL') {
   });
 }
 
-const MOOD_OPTIONS = [
-  { label: 'Tired, just feed me', emoji: '😮‍💨', types: ['restaurant', 'meal_takeaway'], speed: true },
-  { label: 'Quick, back in 30', emoji: '⚡', types: ['fast_food_restaurant', 'sandwich_shop'], speed: true },
-  { label: 'Out with someone', emoji: '🥂', types: ['restaurant', 'bar'], speed: false },
-  { label: 'Treat myself tonight', emoji: '👑', types: ['fine_dining_restaurant', 'restaurant'], speed: false },
+const MOODS = [
+  { label: 'Fast and close', sub: 'Quick bite, no wait' },
+  { label: 'Treat myself', sub: 'Something worth it' },
+  { label: 'Out with someone', sub: 'Good for two or more' },
+  { label: 'Just feed me', sub: 'Anything nearby' },
 ];
 
-const PRICE_MAP = { PRICE_LEVEL_INEXPENSIVE: '$', PRICE_LEVEL_MODERATE: '$$', PRICE_LEVEL_EXPENSIVE: '$$$', PRICE_LEVEL_VERY_EXPENSIVE: '$$$$' };
+const PRICE = {
+  PRICE_LEVEL_FREE: 'Free',
+  PRICE_LEVEL_INEXPENSIVE: '$',
+  PRICE_LEVEL_MODERATE: '$$',
+  PRICE_LEVEL_EXPENSIVE: '$$$',
+  PRICE_LEVEL_VERY_EXPENSIVE: '$$$$',
+};
 
-const FoodDecider = () => {
+export default function FoodDecider() {
   const [screen, setScreen] = useState('location');
-  const [locationText, setLocationText] = useState('');
+  const [locationLabel, setLocationLabel] = useState('');
   const [coords, setCoords] = useState(null);
-  const [locationLoading, setLocationLoading] = useState(false);
-  const [selectedMood, setSelectedMood] = useState(null);
-  const [results, setResults] = useState([]);
+  const [locLoading, setLocLoading] = useState(false);
+  const [locError, setLocError] = useState('');
+  const [manualInput, setManualInput] = useState('');
+  const [mood, setMood] = useState(null);
+  const [places, setPlaces] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [voteScreen, setVoteScreen] = useState(null);
-  const [voteSubmitted, setVoteSubmitted] = useState(false);
+  const [error, setError] = useState('');
   const [votes, setVotes] = useState({});
+  const [voteTarget, setVoteTarget] = useState(null);
+  const [voteSubmitted, setVoteSubmitted] = useState(false);
   const [countdown, setCountdown] = useState(null);
+  const timerRef = useRef(null);
   const scrollRef = useRef(null);
   const inputRef = useRef(null);
-  const timerRef = useRef(null);
 
-  const fetchLiveScore = async (placeId) => {
+  useEffect(() => {
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, []);
+
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = 0;
+  }, [screen]);
+
+  const getScore = async (id) => {
     if (!supabase) return null;
     try {
       const { data } = await supabase
         .from('votes')
         .select('worth_it, created_at')
-        .eq('restaurant_id', placeId)
+        .eq('restaurant_id', id)
         .order('created_at', { ascending: false })
         .limit(50);
-      if (!data || data.length === 0) return null;
+      if (!data?.length) return null;
       const pct = Math.round((data.filter(v => v.worth_it).length / data.length) * 100);
-      const diffMin = Math.floor((Date.now() - new Date(data[0].created_at)) / 60000);
-      const freshness = diffMin < 1 ? 'just now' : diffMin < 60 ? `${diffMin} min ago` : `${Math.floor(diffMin / 60)}h ago`;
+      const mins = Math.floor((Date.now() - new Date(data[0].created_at)) / 60000);
+      const freshness = mins < 1 ? 'just now' : mins < 60 ? `${mins}m ago` : `${Math.floor(mins / 60)}h ago`;
       return { pct, freshness };
     } catch { return null; }
   };
 
-  const submitVote = async (worthIt) => {
-    if (!voteScreen) return;
+  const castVote = async (worthIt) => {
+    if (!voteTarget) return;
     if (supabase) {
       try {
         await supabase.from('votes').insert({
-          restaurant_id: voteScreen.id,
-          dish_name: voteScreen.name,
+          restaurant_id: voteTarget.id,
+          dish_name: voteTarget.name,
           worth_it: worthIt,
-          created_at: new Date().toISOString()
+          created_at: new Date().toISOString(),
         });
-        setVotes(prev => ({ ...prev, [voteScreen.id]: { pct: worthIt ? 100 : 0, freshness: 'just now' } }));
       } catch (e) { console.log(e); }
     }
+    setVotes(prev => ({ ...prev, [voteTarget.id]: { pct: worthIt ? 100 : 0, freshness: 'just now' } }));
     setVoteSubmitted(true);
     if (timerRef.current) clearInterval(timerRef.current);
-    setTimeout(() => {
-      setVoteScreen(null);
-      setVoteSubmitted(false);
-      setCountdown(null);
-    }, 2500);
+    setTimeout(() => { setVoteTarget(null); setVoteSubmitted(false); setCountdown(null); }, 2500);
   };
 
-  const detectLocation = () => {
-    setLocationLoading(true);
-    setError(null);
+  const detectGPS = () => {
+    setLocLoading(true);
+    setLocError('');
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
+      pos => {
         setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-        setLocationText('Current location');
-        setLocationLoading(false);
+        setLocationLabel('Current location');
+        setLocLoading(false);
         setScreen('mood');
       },
-      () => {
-        setLocationLoading(false);
-        setError('Could not detect location. Type your neighborhood below.');
-      }
+      () => { setLocLoading(false); setLocError('Could not detect location. Type it below.'); }
     );
   };
 
-  const handleManualLocation = async () => {
-    if (!locationText.trim()) return;
-    setLocationLoading(true);
-    setError(null);
+  const searchLocation = async () => {
+    if (!manualInput.trim()) return;
+    setLocLoading(true);
+    setLocError('');
     try {
-      const res = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(locationText)}&key=AIzaSyBQLTI-ujYowNSyuK-rgkZvvDkRyanbAi4`);
-      const data = await res.json();
-      if (data.results && data.results[0]) {
-        const loc = data.results[0].geometry.location;
+      const r = await fetch(
+        `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(manualInput)}&key=${process.env.REACT_APP_GOOGLE_KEY || 'YOUR_GEOCODE_KEY'}`
+      );
+      const d = await r.json();
+      if (d.results?.[0]) {
+        const loc = d.results[0].geometry.location;
         setCoords({ lat: loc.lat, lng: loc.lng });
+        setLocationLabel(manualInput);
         setScreen('mood');
       } else {
-        setError('Location not found. Try again.');
+        setLocError('Location not found. Try again.');
       }
-    } catch {
-      setError('Could not find location. Try again.');
-    }
-    setLocationLoading(false);
+    } catch { setLocError('Could not find location.'); }
+    setLocLoading(false);
   };
 
-  const handleMood = async (mood) => {
-    setSelectedMood(mood);
+  const pickMood = async (m) => {
+    setMood(m);
     setScreen('results');
     setLoading(true);
-    setError(null);
-
+    setError('');
     try {
-      const type = mood.types[0];
-      const res = await fetch(`/api/places?lat=${coords.lat}&lng=${coords.lng}&type=${type}`);
+      const res = await fetch(`/api/places?lat=${coords.lat}&lng=${coords.lng}`);
       const data = await res.json();
-
-      if (!data.places || data.places.length === 0) {
-        setError('No restaurants found nearby. Try a different location.');
+      if (!data.places?.length) {
+        setError('No open restaurants found nearby. Try a different location.');
         setLoading(false);
         return;
       }
-
       const top2 = data.places.slice(0, 2);
-      const scoresArr = await Promise.all(top2.map(p => fetchLiveScore(p.id)));
+      const scoreArr = await Promise.all(top2.map(p => getScore(p.id)));
       const newVotes = {};
-      top2.forEach((p, i) => { if (scoresArr[i]) newVotes[p.id] = scoresArr[i]; });
+      top2.forEach((p, i) => { if (scoreArr[i]) newVotes[p.id] = scoreArr[i]; });
       setVotes(prev => ({ ...prev, ...newVotes }));
-      setResults(top2);
-    } catch (err) {
-      setError('Something went wrong. Please try again.');
-    }
+      setPlaces(top2);
+    } catch { setError('Something went wrong. Please try again.'); }
     setLoading(false);
   };
 
-  const handleGoThere = (place) => {
-    const name = place.displayName?.text || '';
-    const address = place.shortFormattedAddress || '';
-    window.open(`https://maps.google.com/search?q=${encodeURIComponent(name + ' ' + address)}`, '_blank');
-
-    let secs = 2700;
-    setCountdown(secs);
+  const goThere = (place) => {
+    const q = encodeURIComponent(`${place.displayName?.text} ${place.shortFormattedAddress}`);
+    window.open(`https://maps.google.com/search?q=${q}`, '_blank');
+    let s = 2700;
+    setCountdown(s);
     timerRef.current = setInterval(() => {
-      secs -= 1;
-      setCountdown(secs);
-      if (secs <= 0) {
+      s -= 1;
+      setCountdown(s);
+      if (s <= 0) {
         clearInterval(timerRef.current);
-        setVoteScreen({ id: place.id, name: place.displayName?.text || 'this place' });
+        setVoteTarget({ id: place.id, name: place.displayName?.text });
       }
     }, 1000);
   };
 
-  const formatCountdown = (secs) => {
-    const m = Math.floor(secs / 60);
-    const s = secs % 60;
-    return `${m}:${s.toString().padStart(2, '0')}`;
-  };
+  const fmtCountdown = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 
   const reset = () => {
     setScreen('mood');
-    setResults([]);
-    setSelectedMood(null);
-    setError(null);
+    setPlaces([]);
+    setMood(null);
+    setError('');
     if (timerRef.current) clearInterval(timerRef.current);
     setCountdown(null);
   };
 
-  const W = {
-    page: {
-      width: '100%',
-      height: '100%',
-      display: 'flex',
-      flexDirection: 'column',
-      background: '#FFF8F0',
-      fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif',
-      color: '#1A0A00',
-      overflow: 'hidden',
-      position: 'relative'
-    },
-    header: {
-      background: '#FFF8F0',
-      borderBottom: '1px solid #F0E0D0',
-      padding: '0 20px 14px',
-      paddingTop: 'calc(env(safe-area-inset-top) + 14px)',
-      textAlign: 'center',
-      flexShrink: 0
-    },
-    logo: { fontSize: '26px', fontWeight: '900', color: '#E8450A', letterSpacing: '-0.5px' },
-    logoSub: { fontSize: '11px', color: '#C4A898', marginTop: '2px', letterSpacing: '0.06em', textTransform: 'uppercase' },
-    scroll: { flex: 1, overflowY: 'scroll', WebkitOverflowScrolling: 'touch', padding: '20px 16px' },
-    inner: { maxWidth: '440px', margin: '0 auto' },
-    card: { background: '#fff', border: '1px solid #F0E0D0', borderRadius: '16px', padding: '16px', marginBottom: '12px', boxShadow: '0 1px 3px rgba(232,69,10,0.06)' },
-    label: { fontSize: '11px', fontWeight: '700', color: '#C4A898', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' },
-    title: { fontSize: '22px', fontWeight: '800', color: '#1A0A00', letterSpacing: '-0.3px', marginBottom: '4px' },
-    sub: { fontSize: '14px', color: '#8B6A5A', lineHeight: '1.5', marginBottom: '16px' },
-    primaryBtn: { width: '100%', background: '#E8450A', color: '#fff', border: 'none', borderRadius: '12px', padding: '15px', fontSize: '15px', fontWeight: '800', cursor: 'pointer', marginBottom: '10px' },
-    ghostBtn: { width: '100%', background: 'transparent', color: '#C4A898', border: '1px solid #F0E0D0', borderRadius: '12px', padding: '13px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' },
-    input: { width: '100%', background: '#FFF8F0', border: '1px solid #F0E0D0', borderRadius: '12px', padding: '13px 16px', fontSize: '16px', color: '#1A0A00', outline: 'none', marginBottom: '10px', WebkitAppearance: 'none' },
-    moodBtn: { width: '100%', background: '#FFF8F0', border: '1px solid #F0E0D0', borderRadius: '14px', padding: '16px', marginBottom: '10px', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '14px', WebkitTapHighlightColor: 'transparent' },
-    moodEmoji: { fontSize: '28px', flexShrink: 0 },
-    moodLabel: { fontSize: '16px', fontWeight: '700', color: '#1A0A00' },
-    restCard: (isFirst) => ({ background: '#fff', border: `1px solid ${isFirst ? '#E8450A' : '#F0E0D0'}`, borderRadius: '16px', marginBottom: '12px', overflow: 'hidden', boxShadow: isFirst ? '0 2px 12px rgba(232,69,10,0.12)' : '0 1px 3px rgba(0,0,0,0.04)' }),
-    topPick: { background: '#E8450A', padding: '5px 0', fontSize: '10px', fontWeight: '800', color: '#fff', letterSpacing: '0.1em', textAlign: 'center' },
-    restInner: { padding: '16px' },
-    restName: { fontSize: '20px', fontWeight: '900', color: '#1A0A00', letterSpacing: '-0.3px', marginBottom: '3px' },
-    restMeta: { fontSize: '12px', color: '#C4A898', marginBottom: '12px' },
-    statsGrid: { display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '6px', marginBottom: '12px' },
-    statBox: (color) => ({ background: '#FFF8F0', border: '1px solid #F0E0D0', borderRadius: '10px', padding: '10px 6px', textAlign: 'center' }),
-    statVal: (color) => ({ fontSize: '13px', fontWeight: '800', color }),
-    statSub: { fontSize: '9px', color: '#C4A898', marginTop: '3px' },
-    liveBadge: (hasScore) => ({ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }),
-    liveDot: (hasScore) => ({ width: '6px', height: '6px', borderRadius: '50%', background: hasScore ? '#22A05B' : '#E0D0C8', flexShrink: 0 }),
-    liveText: (hasScore) => ({ fontSize: '11px', fontWeight: '700', color: hasScore ? '#22A05B' : '#C4A898' }),
-    takeBtn: (isFirst) => ({ width: '100%', background: isFirst ? '#E8450A' : 'transparent', color: isFirst ? '#fff' : '#C4A898', border: isFirst ? 'none' : '1px solid #F0E0D0', borderRadius: '12px', padding: '14px', fontSize: '14px', fontWeight: '800', cursor: 'pointer', marginBottom: '10px' }),
-    phoneLink: { display: 'block', textAlign: 'center', fontSize: '12px', color: '#C4A898', textDecoration: 'none' },
-    overlay: { position: 'absolute', inset: 0, zIndex: 100, background: 'rgba(26,10,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px', backdropFilter: 'blur(4px)' },
-    overlayCard: { background: '#fff', borderRadius: '24px', padding: '28px 22px', maxWidth: '340px', width: '100%', boxShadow: '0 20px 60px rgba(232,69,10,0.2)' },
-    errorBox: { background: '#FFF0EB', border: '1px solid #FFD0C0', borderRadius: '12px', padding: '12px 14px', marginBottom: '12px', fontSize: '13px', color: '#E8450A', lineHeight: '1.5' },
-    countdownBar: { background: '#FFF0EB', borderTop: '1px solid #FFD0C0', padding: '12px 20px', textAlign: 'center', flexShrink: 0 },
+  // ─── STYLES ───────────────────────────────────────────────
+  const C = {
+    bg: '#0D0D0D',
+    surface: '#161616',
+    border: '#1F1F1F',
+    text: '#F5F0EB',
+    muted: '#6B6460',
+    accent: '#E8850A',
+    accentDim: 'rgba(232,133,10,0.12)',
+    green: '#22A05B',
+    greenDim: 'rgba(34,160,91,0.12)',
+    red: '#E05555',
   };
 
-  return (
-    <div style={W.page}>
+  const page = {
+    width: '100%', height: '100%',
+    display: 'flex', flexDirection: 'column',
+    background: C.bg,
+    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", sans-serif',
+    color: C.text,
+    overflow: 'hidden',
+    position: 'relative',
+  };
 
-      {voteScreen && (
-        <div style={W.overlay}>
-          <div style={W.overlayCard}>
+  const header = {
+    background: C.bg,
+    borderBottom: `1px solid ${C.border}`,
+    padding: '0 24px 16px',
+    paddingTop: 'calc(env(safe-area-inset-top) + 16px)',
+    flexShrink: 0,
+    textAlign: 'center',
+  };
+
+  const scroll = {
+    flex: 1, overflowY: 'scroll',
+    WebkitOverflowScrolling: 'touch',
+    padding: '24px 20px',
+  };
+
+  const inner = { maxWidth: '420px', margin: '0 auto' };
+
+  return (
+    <div style={page}>
+
+      {/* ── VOTE OVERLAY ── */}
+      {voteTarget && (
+        <div style={{ position: 'absolute', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+          <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: '24px', padding: '32px 24px', maxWidth: '360px', width: '100%' }}>
             {!voteSubmitted ? (
               <>
-                <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-                  <div style={{ fontSize: '44px', marginBottom: '10px' }}>🍽️</div>
-                  <div style={{ fontSize: '22px', fontWeight: '900', color: '#1A0A00', marginBottom: '4px' }}>How was it?</div>
-                  <div style={{ fontSize: '13px', color: '#8B6A5A' }}>One tap · takes 2 seconds</div>
-                </div>
-                <div style={{ background: '#FFF8F0', border: '1px solid #F0E0D0', borderRadius: '12px', padding: '12px 14px', marginBottom: '18px' }}>
-                  <div style={{ fontSize: '14px', fontWeight: '700', color: '#1A0A00' }}>{voteScreen.name}</div>
-                  <div style={{ fontSize: '11px', color: '#C4A898', marginTop: '2px' }}>was it worth it?</div>
+                <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+                  <div style={{ fontSize: '13px', color: C.muted, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '10px' }}>You just ate</div>
+                  <div style={{ fontSize: '22px', fontWeight: '700', color: C.text, marginBottom: '6px' }}>{voteTarget.name}</div>
+                  <div style={{ fontSize: '14px', color: C.muted }}>Was it worth it?</div>
                 </div>
                 <div style={{ display: 'flex', gap: '10px' }}>
-                  <button onClick={() => submitVote(true)} style={{ flex: 1, background: '#E8F5EE', border: '1px solid #22A05B', color: '#22A05B', borderRadius: '12px', padding: '15px', fontSize: '15px', fontWeight: '800', cursor: 'pointer' }}>✓ Worth it</button>
-                  <button onClick={() => submitVote(false)} style={{ flex: 1, background: '#FFF0EB', border: '1px solid #E8450A', color: '#E8450A', borderRadius: '12px', padding: '15px', fontSize: '15px', fontWeight: '800', cursor: 'pointer' }}>✗ Not quite</button>
+                  <button onClick={() => castVote(true)} style={{ flex: 1, background: C.greenDim, border: `1px solid ${C.green}`, color: C.green, borderRadius: '14px', padding: '16px', fontSize: '15px', fontWeight: '700', cursor: 'pointer', transition: 'all 0.15s' }}>
+                    Worth it
+                  </button>
+                  <button onClick={() => castVote(false)} style={{ flex: 1, background: 'rgba(224,85,85,0.08)', border: `1px solid ${C.red}`, color: C.red, borderRadius: '14px', padding: '16px', fontSize: '15px', fontWeight: '700', cursor: 'pointer', transition: 'all 0.15s' }}>
+                    Not quite
+                  </button>
                 </div>
-                <div style={{ textAlign: 'center', fontSize: '10px', color: '#C4A898', marginTop: '12px' }}>your vote updates the score in real time</div>
+                <div style={{ textAlign: 'center', fontSize: '11px', color: C.muted, marginTop: '14px' }}>
+                  your vote updates the score for the next person
+                </div>
               </>
             ) : (
               <div style={{ textAlign: 'center', padding: '16px 0' }}>
-                <div style={{ fontSize: '48px', marginBottom: '12px' }}>✅</div>
-                <div style={{ fontSize: '20px', fontWeight: '900', color: '#1A0A00', marginBottom: '6px' }}>Logged!</div>
-                <div style={{ fontSize: '13px', color: '#8B6A5A', lineHeight: '1.6' }}>Score updated.<br />You helped the next person decide.</div>
+                <div style={{ fontSize: '44px', marginBottom: '14px' }}>✓</div>
+                <div style={{ fontSize: '20px', fontWeight: '700', color: C.text, marginBottom: '6px' }}>Logged</div>
+                <div style={{ fontSize: '14px', color: C.muted }}>You helped the next person decide.</div>
               </div>
             )}
           </div>
         </div>
       )}
 
-      <div style={W.header}>
-        <div style={W.logo}>Bitten60</div>
-        <div style={W.logoSub}>2 picks · someone was just there</div>
+      {/* ── HEADER ── */}
+      <div style={header}>
+        <div style={{ fontSize: '22px', fontWeight: '800', color: C.accent, letterSpacing: '-0.5px' }}>Bitten60</div>
+        <div style={{ fontSize: '11px', color: C.muted, marginTop: '3px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>2 picks · someone was just there</div>
       </div>
 
+      {/* ── COUNTDOWN BAR ── */}
       {countdown !== null && countdown > 0 && (
-        <div style={W.countdownBar}>
-          <span style={{ fontSize: '13px', color: '#E8450A', fontWeight: '700' }}>
-            Vote opens in {formatCountdown(countdown)} — keep this tab open 🍽️
+        <div style={{ background: C.accentDim, borderBottom: `1px solid ${C.border}`, padding: '10px 20px', textAlign: 'center', flexShrink: 0 }}>
+          <span style={{ fontSize: '12px', color: C.accent, fontWeight: '600' }}>
+            Vote opens in {fmtCountdown(countdown)} — keep this tab open
           </span>
         </div>
       )}
 
-      <div ref={scrollRef} style={W.scroll}>
-        <div style={W.inner}>
+      {/* ── SCROLL AREA ── */}
+      <div ref={scrollRef} style={scroll}>
+        <div style={inner}>
 
+          {/* LOCATION SCREEN */}
           {screen === 'location' && (
             <div>
-              <div style={{ ...W.title, marginBottom: '6px', marginTop: '8px' }}>Where are you?</div>
-              <div style={{ ...W.sub, marginBottom: '20px' }}>We'll find the best spots near you</div>
+              <div style={{ marginBottom: '32px', marginTop: '8px' }}>
+                <div style={{ fontSize: '28px', fontWeight: '800', color: C.text, letterSpacing: '-0.5px', marginBottom: '8px', lineHeight: 1.2 }}>
+                  Where are you?
+                </div>
+                <div style={{ fontSize: '15px', color: C.muted, lineHeight: 1.5 }}>
+                  We'll find the best spots near you
+                </div>
+              </div>
 
-              {error && <div style={W.errorBox}>{error}</div>}
+              {locError && (
+                <div style={{ background: 'rgba(224,85,85,0.08)', border: `1px solid ${C.red}`, borderRadius: '12px', padding: '12px 16px', marginBottom: '16px', fontSize: '13px', color: C.red, lineHeight: 1.5 }}>
+                  {locError}
+                </div>
+              )}
 
-              <button onClick={detectLocation} style={W.primaryBtn} disabled={locationLoading}>
-                {locationLoading ? 'Detecting...' : '📍 Use my current location'}
+              <button
+                onClick={detectGPS}
+                disabled={locLoading}
+                style={{ width: '100%', background: C.accent, color: '#fff', border: 'none', borderRadius: '14px', padding: '16px', fontSize: '15px', fontWeight: '700', cursor: 'pointer', marginBottom: '12px', opacity: locLoading ? 0.7 : 1, transition: 'opacity 0.2s' }}
+              >
+                {locLoading ? 'Detecting...' : 'Use my current location'}
               </button>
 
-              <div style={{ textAlign: 'center', fontSize: '12px', color: '#C4A898', margin: '12px 0' }}>or type your neighborhood</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: '20px 0' }}>
+                <div style={{ flex: 1, height: '1px', background: C.border }} />
+                <div style={{ fontSize: '12px', color: C.muted }}>or</div>
+                <div style={{ flex: 1, height: '1px', background: C.border }} />
+              </div>
 
               <input
                 ref={inputRef}
                 type="text"
-                value={locationText}
-                onChange={e => setLocationText(e.target.value)}
-                onKeyPress={e => e.key === 'Enter' && handleManualLocation()}
+                value={manualInput}
+                onChange={e => setManualInput(e.target.value)}
+                onKeyPress={e => e.key === 'Enter' && searchLocation()}
                 placeholder="Culver City, Downtown LA..."
-                style={W.input}
+                style={{ width: '100%', background: C.surface, border: `1px solid ${C.border}`, borderRadius: '14px', padding: '15px 16px', fontSize: '16px', color: C.text, outline: 'none', marginBottom: '10px', WebkitAppearance: 'none', boxSizing: 'border-box' }}
               />
-              <button onClick={handleManualLocation} style={W.ghostBtn} disabled={locationLoading}>
-                {locationLoading ? 'Finding...' : 'Search this area'}
+
+              <button
+                onClick={searchLocation}
+                disabled={locLoading || !manualInput.trim()}
+                style={{ width: '100%', background: 'transparent', color: C.muted, border: `1px solid ${C.border}`, borderRadius: '14px', padding: '15px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', opacity: !manualInput.trim() ? 0.4 : 1, transition: 'opacity 0.2s' }}
+              >
+                Search this area
               </button>
             </div>
           )}
 
+          {/* MOOD SCREEN */}
           {screen === 'mood' && (
             <div>
-              <div style={{ ...W.title, marginBottom: '4px', marginTop: '8px' }}>What's the vibe?</div>
-              <div style={{ ...W.sub, marginBottom: '20px' }}>Pick one — we'll handle the rest</div>
-              {MOOD_OPTIONS.map((mood, i) => (
-                <button key={i} onClick={() => handleMood(mood)} style={W.moodBtn}>
-                  <span style={W.moodEmoji}>{mood.emoji}</span>
-                  <span style={W.moodLabel}>{mood.label}</span>
-                </button>
-              ))}
-              <button onClick={() => setScreen('location')} style={{ ...W.ghostBtn, marginTop: '4px' }}>
-                ← change location
+              <div style={{ marginBottom: '28px', marginTop: '8px' }}>
+                <div style={{ fontSize: '13px', color: C.muted, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '8px' }}>
+                  Near {locationLabel}
+                </div>
+                <div style={{ fontSize: '28px', fontWeight: '800', color: C.text, letterSpacing: '-0.5px', lineHeight: 1.2 }}>
+                  What's the plan?
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {MOODS.map((m, i) => (
+                  <button
+                    key={i}
+                    onClick={() => pickMood(m)}
+                    style={{
+                      width: '100%',
+                      background: C.surface,
+                      border: `1px solid ${C.border}`,
+                      borderRadius: '16px',
+                      padding: '20px 22px',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      transition: 'border-color 0.15s, background 0.15s',
+                      WebkitTapHighlightColor: 'transparent',
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.background = C.accentDim; }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.background = C.surface; }}
+                  >
+                    <div style={{ fontSize: '18px', fontWeight: '700', color: C.text, marginBottom: '4px', letterSpacing: '-0.2px' }}>{m.label}</div>
+                    <div style={{ fontSize: '13px', color: C.muted }}>{m.sub}</div>
+                  </button>
+                ))}
+              </div>
+
+              <button
+                onClick={() => setScreen('location')}
+                style={{ width: '100%', background: 'transparent', color: C.muted, border: 'none', padding: '16px', fontSize: '13px', cursor: 'pointer', marginTop: '8px' }}
+              >
+                ← Change location
               </button>
             </div>
           )}
 
+          {/* RESULTS SCREEN */}
           {screen === 'results' && (
             <div>
               {loading && (
-                <div style={{ textAlign: 'center', padding: '40px 0' }}>
-                  <div style={{ width: '32px', height: '32px', border: '3px solid #F0E0D0', borderTopColor: '#E8450A', borderRadius: '50%', animation: 'spin 0.7s linear infinite', margin: '0 auto 14px' }} />
-                  <div style={{ fontSize: '14px', color: '#8B6A5A' }}>Finding your 2 best spots...</div>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 0' }}>
+                  <div style={{ width: '28px', height: '28px', border: `2px solid ${C.border}`, borderTopColor: C.accent, borderRadius: '50%', animation: 'spin 0.7s linear infinite', marginBottom: '16px' }} />
+                  <div style={{ fontSize: '14px', color: C.muted }}>Finding your 2 best spots...</div>
                 </div>
               )}
 
               {error && !loading && (
                 <div>
-                  <div style={W.errorBox}>{error}</div>
-                  <button onClick={reset} style={W.primaryBtn}>Try again</button>
+                  <div style={{ background: 'rgba(224,85,85,0.08)', border: `1px solid ${C.red}`, borderRadius: '14px', padding: '14px 16px', marginBottom: '16px', fontSize: '14px', color: C.red, lineHeight: 1.5 }}>
+                    {error}
+                  </div>
+                  <button onClick={reset} style={{ width: '100%', background: C.accent, color: '#fff', border: 'none', borderRadius: '14px', padding: '15px', fontSize: '15px', fontWeight: '700', cursor: 'pointer' }}>
+                    Try again
+                  </button>
                 </div>
               )}
 
-              {!loading && !error && results.length > 0 && (
+              {!loading && !error && places.length > 0 && (
                 <div>
-                  <div style={{ fontSize: '12px', color: '#C4A898', marginBottom: '14px', textAlign: 'center' }}>
-                    your 2 picks near {locationText || 'you'}
+                  <div style={{ fontSize: '13px', color: C.muted, marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                    Your 2 picks near {locationLabel}
                   </div>
 
-                  {results.map((place, ri) => {
-                    const score = votes[place.id];
+                  {places.map((place, ri) => {
                     const isFirst = ri === 0;
+                    const score = votes[place.id];
                     const name = place.displayName?.text || 'Restaurant';
                     const address = place.shortFormattedAddress || '';
                     const rating = place.rating;
-                    const reviewCount = place.userRatingCount;
-                    const price = PRICE_MAP[place.priceLevel] || '';
-                  const isOpen = place.regularOpeningHours?.openNow;
+                    const reviews = place.userRatingCount;
+                    const price = PRICE[place.priceLevel] || '';
+                    const summary = place.editorialSummary?.text || '';
 
                     return (
-                      <div key={place.id} style={W.restCard(isFirst)}>
-                        {isFirst && <div style={W.topPick}>TOP PICK</div>}
-                        <div style={W.restInner}>
-                          <div style={W.liveBadge(!!score)}>
-                            <div style={W.liveDot(!!score)} />
-                            <span style={W.liveText(!!score)}>
-                              {score ? `${score.pct}% worth it · voted ${score.freshness}` : 'be the first to vote after visiting'}
+                      <div
+                        key={place.id}
+                        style={{
+                          background: C.surface,
+                          border: `1px solid ${isFirst ? C.accent : C.border}`,
+                          borderRadius: '20px',
+                          marginBottom: '12px',
+                          overflow: 'hidden',
+                          boxShadow: isFirst ? `0 0 0 1px ${C.accent}22, 0 4px 24px rgba(232,133,10,0.08)` : 'none',
+                        }}
+                      >
+                        {isFirst && (
+                          <div style={{ background: C.accent, padding: '6px 0', textAlign: 'center', fontSize: '10px', fontWeight: '800', color: '#fff', letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+                            Top Pick
+                          </div>
+                        )}
+
+                        <div style={{ padding: '20px' }}>
+
+                          {/* Live vote badge */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '7px', marginBottom: '12px' }}>
+                            <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: score ? C.green : C.border, flexShrink: 0 }} />
+                            <span style={{ fontSize: '11px', fontWeight: '600', color: score ? C.green : C.muted, letterSpacing: '0.02em' }}>
+                              {score ? `${score.pct}% worth it · voted ${score.freshness}` : 'Be the first to vote after visiting'}
                             </span>
                           </div>
-                          <div style={W.restName}>{name}</div>
-                          <div style={W.restMeta}>
-                            📍 {address} · {isOpen ? '🟢 Open now' : '🔴 Closed'}
+
+                          {/* Name */}
+                          <div style={{ fontSize: '22px', fontWeight: '800', color: C.text, letterSpacing: '-0.4px', marginBottom: '4px', lineHeight: 1.2 }}>
+                            {name}
                           </div>
-                          <div style={W.statsGrid}>
+
+                          {/* Address */}
+                          <div style={{ fontSize: '13px', color: C.muted, marginBottom: '16px', lineHeight: 1.4 }}>
+                            {address}
+                          </div>
+
+                          {/* Summary */}
+                          {summary && (
+                            <div style={{ fontSize: '13px', color: '#8B8480', lineHeight: 1.6, marginBottom: '16px', fontStyle: 'italic' }}>
+                              "{summary}"
+                            </div>
+                          )}
+
+                          {/* Stats */}
+                          <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
                             {[
-                              { val: rating ? `${rating}★` : 'New', sub: reviewCount ? `${reviewCount} reviews` : 'no reviews yet', color: '#E8450A' },
-                              { val: price || '?', sub: 'price', color: '#22A05B' },
-                              { val: isOpen ? 'Open' : 'Closed', sub: 'right now', color: isOpen ? '#22A05B' : '#C4A898' },
+                              { val: rating ? `${rating}★` : '—', sub: reviews ? `${reviews.toLocaleString()} reviews` : 'No reviews', color: C.accent },
+                              { val: price || '—', sub: 'Price range', color: C.green },
                             ].map((st, si) => (
-                              <div key={si} style={W.statBox(st.color)}>
-                                <div style={W.statVal(st.color)}>{st.val}</div>
-                                <div style={W.statSub}>{st.sub}</div>
+                              <div key={si} style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: '12px', padding: '11px 14px', flex: 1 }}>
+                                <div style={{ fontSize: '15px', fontWeight: '800', color: st.color, marginBottom: '2px' }}>{st.val}</div>
+                                <div style={{ fontSize: '10px', color: C.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{st.sub}</div>
                               </div>
                             ))}
                           </div>
-                          <button onClick={() => handleGoThere(place)} style={W.takeBtn(isFirst)}>
-                            {isFirst ? '🗺️ Take me here' : '🗺️ Or go here instead'}
+
+                          {/* CTA */}
+                          <button
+                            onClick={() => goThere(place)}
+                            style={{
+                              width: '100%',
+                              background: isFirst ? C.accent : 'transparent',
+                              color: isFirst ? '#fff' : C.muted,
+                              border: isFirst ? 'none' : `1px solid ${C.border}`,
+                              borderRadius: '14px',
+                              padding: '15px',
+                              fontSize: '15px',
+                              fontWeight: '700',
+                              cursor: 'pointer',
+                              marginBottom: '12px',
+                              letterSpacing: '-0.1px',
+                              transition: 'opacity 0.15s',
+                            }}
+                          >
+                            {isFirst ? 'Take me here' : 'Or go here instead'}
                           </button>
+
                           {place.internationalPhoneNumber && (
-                            <a href={`tel:${place.internationalPhoneNumber}`} style={W.phoneLink}>
-                              📞 {place.internationalPhoneNumber}
+                            <a href={`tel:${place.internationalPhoneNumber}`} style={{ display: 'block', textAlign: 'center', fontSize: '12px', color: C.muted, textDecoration: 'none' }}>
+                              {place.internationalPhoneNumber}
                             </a>
                           )}
                         </div>
@@ -392,8 +492,11 @@ const FoodDecider = () => {
                     );
                   })}
 
-                  <button onClick={reset} style={{ ...W.ghostBtn, marginTop: '4px' }}>
-                    try a different vibe
+                  <button
+                    onClick={reset}
+                    style={{ width: '100%', background: 'transparent', color: C.muted, border: `1px solid ${C.border}`, borderRadius: '14px', padding: '14px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', marginTop: '4px' }}
+                  >
+                    Try a different vibe
                   </button>
                 </div>
               )}
@@ -406,12 +509,11 @@ const FoodDecider = () => {
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        button:active { opacity: 0.8; transform: scale(0.98); }
-        input::placeholder { color: #C4A898; }
+        button:active { opacity: 0.7 !important; transform: scale(0.98); }
+        input::placeholder { color: #4A4440; }
         ::-webkit-scrollbar { display: none; }
+        body { background: #0D0D0D; }
       `}</style>
     </div>
   );
-};
-
-export default FoodDecider;
+}
