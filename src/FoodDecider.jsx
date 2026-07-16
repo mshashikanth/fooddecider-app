@@ -122,11 +122,54 @@ export default function FoodDecider() {
     setLocLoading(false);
   };
 
+  const sortByMood = (places, moodLabel) => {
+    const priceOrder = { PRICE_LEVEL_INEXPENSIVE: 1, PRICE_LEVEL_MODERATE: 2, PRICE_LEVEL_EXPENSIVE: 3, PRICE_LEVEL_VERY_EXPENSIVE: 4 };
+    const getPrice = p => priceOrder[p.priceLevel] || 2;
+    const getRating = p => p.rating || 0;
+    const hasDesc = p => !!p.editorialSummary?.text;
+
+    switch (moodLabel) {
+      case 'Fast and close':
+        // Cheap and decent rating — avoid expensive places
+        return [...places]
+          .filter(p => getPrice(p) <= 2)
+          .sort((a, b) => getRating(b) - getRating(a))
+          .concat(places.filter(p => getPrice(p) > 2))
+          .slice(0, 2);
+
+      case 'Treat myself':
+        // Highest rated, prefer expensive/notable places
+        return [...places]
+          .sort((a, b) => {
+            const priceDiff = getPrice(b) - getPrice(a);
+            const ratingDiff = getRating(b) - getRating(a);
+            return priceDiff !== 0 ? priceDiff : ratingDiff;
+          })
+          .slice(0, 2);
+
+      case 'Out with someone':
+        // Highest rated with editorial summary preferred — notable places
+        return [...places]
+          .sort((a, b) => {
+            if (hasDesc(a) && !hasDesc(b)) return -1;
+            if (!hasDesc(a) && hasDesc(b)) return 1;
+            return getRating(b) - getRating(a);
+          })
+          .slice(0, 2);
+
+      case 'Just feed me':
+      default:
+        // Pure Google popularity — whatever comes first
+        return places.slice(0, 2);
+    }
+  };
+
   const pickMood = async (m) => {
     setMood(m);
+    setPlaces([]);
+    setError('');
     setScreen('results');
     setLoading(true);
-    setError('');
     try {
       const res = await fetch(`/api/places?lat=${coords.lat}&lng=${coords.lng}`);
       const data = await res.json();
@@ -135,7 +178,8 @@ export default function FoodDecider() {
         setLoading(false);
         return;
       }
-      const top2 = data.places.slice(0, 2);
+      const sorted = sortByMood(data.places, m.label);
+      const top2 = sorted.slice(0, 2);
       const scoreArr = await Promise.all(top2.map(p => getScore(p.id)));
       const newVotes = {};
       top2.forEach((p, i) => { if (scoreArr[i]) newVotes[p.id] = scoreArr[i]; });
@@ -144,7 +188,6 @@ export default function FoodDecider() {
     } catch { setError('Something went wrong. Please try again.'); }
     setLoading(false);
   };
-
   const goThere = (place) => {
     const q = encodeURIComponent(`${place.displayName?.text} ${place.shortFormattedAddress}`);
     window.open(`https://maps.google.com/search?q=${q}`, '_blank');
