@@ -171,7 +171,7 @@ export default function FoodDecider() {
     setScreen('results');
     setLoading(true);
     try {
-      const res = await fetch(`/api/places?lat=${coords.lat}&lng=${coords.lng}`);
+      const res = await fetch(`/api/places?lat=${coords.lat}&lng=${coords.lng}&mood=${encodeURIComponent(m.label)}`);
       const data = await res.json();
       if (!data.places?.length) {
         setError('No open restaurants found nearby. Try a different location.');
