@@ -19,7 +19,7 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         includedTypes: ['restaurant'],
         excludedTypes: ['food_court'],
-        maxResultCount: 10,
+        maxResultCount: 20,
         locationRestriction: {
           circle: {
             center: { latitude: parseFloat(lat), longitude: parseFloat(lng) },
